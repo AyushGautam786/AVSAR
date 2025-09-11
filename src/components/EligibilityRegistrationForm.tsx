@@ -344,7 +344,7 @@ export const EligibilityRegistrationForm: React.FC = () => {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Alert className={`border-2 ${eligibility.eligible 
+                <Alert className={`border-2 w-fit max-w-sm whitespace-normal break-words ${eligibility.eligible 
                   ? "border-green-300 bg-green-50/80 text-green-900" 
                   : "border-red-300 bg-red-50/80 text-red-900"}`}>
                   <div className="flex items-start gap-3">
@@ -353,11 +353,11 @@ export const EligibilityRegistrationForm: React.FC = () => {
                     ) : (
                       <X className="h-5 w-5 mt-0.5 text-red-600" />
                     )}
-                    <AlertDescription className="text-sm">
+                    <AlertDescription className="text-sm whitespace-normal break-words">
                       {eligibility.eligible ? (
-                        <div className="space-y-2">
-                          <span className="font-display font-bold text-base">🎉 You're Eligible!</span>
-                          <p className="text-green-800">All criteria met. Set a password to create your account.</p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">You're eligible</span>
+                          <span className="text-green-800">Set a password to create your account.</span>
                         </div>
                       ) : (
                         <div className="space-y-2">
