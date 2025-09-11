@@ -344,21 +344,18 @@ export const EligibilityRegistrationForm: React.FC = () => {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Alert className={`border-2 w-fit max-w-sm whitespace-normal break-words rounded-2xl px-4 py-3 shadow-sm ${eligibility.eligible 
+                <Alert className={`border w-full max-w-lg mx-auto rounded-2xl px-4 py-3 text-center my-4 ${eligibility.eligible 
                   ? "border-green-300 bg-green-50/80 text-green-900" 
                   : "border-red-300 bg-red-50/80 text-red-900"}`}>
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-center justify-center gap-2 text-center">
                     {eligibility.eligible ? (
-                      <Check className="h-5 w-5 mt-0.5 text-green-600" />
+                      <Check className="h-5 w-5 text-green-600" />
                     ) : (
-                      <X className="h-5 w-5 mt-0.5 text-red-600" />
+                      <X className="h-5 w-5 text-red-600" />
                     )}
-                    <AlertDescription className="text-sm whitespace-normal break-words">
+                    <AlertDescription className="text-sm">
                       {eligibility.eligible ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="inline-block rounded-full bg-green-100 text-green-800 px-3 py-1 text-xs font-semibold">You're eligible</span>
-                          <span className="text-green-900 font-medium">Set <mark>password below</mark> to create your account.</span>
-                        </div>
+                        <span className="font-medium">You're eligible. Set password below.</span>
                       ) : (
                         <div className="space-y-2">
                           <span className="font-display font-bold text-base">❌ Not Eligible</span>
