@@ -126,7 +126,7 @@ export default function Page() {
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 lg:col-start-2">
+        <Card className="lg:col-span-2 lg:order-2">
           <CardHeader>
             <CardTitle className="font-display">Edit Profile</CardTitle>
             <CardDescription>Update your basic info and recommendation preferences</CardDescription>
@@ -236,7 +236,7 @@ export default function Page() {
           </CardContent>
         </Card>
 
-        <Card className="!w-96 !h-[429px] !flex-col !items-stretch">
+        <Card className="lg:order-1 lg:col-span-1 !h-[429px] !flex-col !items-stretch">
           <CardHeader>
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
