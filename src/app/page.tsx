@@ -1,15 +1,14 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import { motion } from "framer-motion";
 import HeaderNav from "@/components/HeaderNav";
 import HomeContent from "@/components/HomeContent";
 import LoginForm from "@/components/LoginForm";
+import ScrollCircles from "@/components/ScrollCircles";
 
 export default function Page() {
   const pathname = usePathname();
-  const [pos, setPos] = useState({ x: 0, y: 0 });
 
   // Determine which content to render based on the current path
   const renderContent = () => {
@@ -30,17 +29,9 @@ export default function Page() {
   return (
     <div
       className="relative min-h-screen flex flex-col bg-background overflow-hidden"
-      onMouseMove={(e) => setPos({ x: e.clientX, y: e.clientY })}
     >
-      {/* Interactive background */}
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div
-          className="absolute -inset-40 blur-3xl opacity-70"
-          style={{
-            background: `radial-gradient(600px circle at ${pos.x}px ${pos.y}px, rgba(16,185,129,0.25), rgba(37,99,235,0.2), transparent 70%)`,
-          }}
-        />
-      </div>
+      {/* Scroll-reactive circles background */}
+      <ScrollCircles />
       {/* Show header navigation for all routes except login */}
       {pathname !== "/auth/login" && <HeaderNav />}
       
