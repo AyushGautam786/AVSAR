@@ -93,9 +93,9 @@ export default function HeaderNav({ className }: HeaderNavProps) {
         {/* Logo and Site Name */}
         <Link href="/" className="flex items-center space-x-2 text-foreground hover:opacity-80 transition-opacity">
           <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">L</span>
+            <span className="text-primary-foreground font-bold text-sm">A</span>
           </div>
-          <span className="font-display font-semibold text-lg">Lendscape</span>
+          <span className="font-display font-semibold text-lg">AVSAR</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -166,7 +166,7 @@ export default function HeaderNav({ className }: HeaderNavProps) {
                     <Link href="/recommendations" className="flex items-center gap-2 px-2 py-2 rounded hover:bg-accent/60 text-sm">
                       <Sparkles className="h-4 w-4" /> Recommendations
                     </Link>
-                    <a href="mailto:support@lendscape.com" className="flex items-center gap-2 px-2 py-2 rounded hover:bg-accent/60 text-sm">
+                    <a href="mailto:support@avsar.com" className="flex items-center gap-2 px-2 py-2 rounded hover:bg-accent/60 text-sm">
                       <LifeBuoy className="h-4 w-4" /> Support
                     </a>
                     <button onClick={handleSignOut} className="flex items-center gap-2 px-2 py-2 rounded hover:bg-accent/60 text-sm text-destructive">
@@ -233,7 +233,7 @@ export default function HeaderNav({ className }: HeaderNavProps) {
                     <button onClick={() => handleNavClick("home")} className="w-full text-left px-3 py-2 rounded hover:bg-accent">Home</button>
                     <button onClick={() => handleNavClick("companies")} className="w-full text-left px-3 py-2 rounded hover:bg-accent">Companies</button>
                     <Link href="/recommendations" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded hover:bg-accent">Recommendations</Link>
-                    <a href="mailto:support@lendscape.com" className="px-3 py-2 rounded hover:bg-accent">Support</a>
+                    <a href="mailto:support@avsar.com" className="px-3 py-2 rounded hover:bg-accent">Support</a>
                     <button onClick={async () => { await handleSignOut(); setMobileMenuOpen(false); }} className="w-full text-left px-3 py-2 rounded hover:bg-accent text-destructive">Sign out</button>
                   </div>
                 ) : (

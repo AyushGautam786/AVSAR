@@ -1,12 +1,15 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { motion } from "framer-motion";
 import HeaderNav from "@/components/HeaderNav";
 import HomeContent from "@/components/HomeContent";
 import LoginForm from "@/components/LoginForm";
 
 export default function Page() {
   const pathname = usePathname();
+  const [pos, setPos] = useState({ x: 0, y: 0 });
 
   // Determine which content to render based on the current path
   const renderContent = () => {
@@ -25,24 +28,47 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div
+      className="relative min-h-screen flex flex-col bg-background overflow-hidden"
+      onMouseMove={(e) => setPos({ x: e.clientX, y: e.clientY })}
+    >
+      {/* Interactive background */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute -inset-40 blur-3xl opacity-70"
+          style={{
+            background: `radial-gradient(600px circle at ${pos.x}px ${pos.y}px, rgba(16,185,129,0.25), rgba(37,99,235,0.2), transparent 70%)`,
+          }}
+        />
+      </div>
       {/* Show header navigation for all routes except login */}
       {pathname !== "/auth/login" && <HeaderNav />}
       
       {/* Main content area */}
-      {renderContent()}
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        {renderContent()}
+      </motion.div>
       
       {/* Footer - only show on home page */}
       {pathname === "/" && (
-        <footer className="border-t border-border bg-card/50">
+        <motion.footer
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut", delay: 0.05 }}
+          className="border-t border-border bg-card/50"
+        >
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
-                    <span className="text-primary-foreground font-bold text-sm">L</span>
+                    <span className="text-primary-foreground font-bold text-sm">A</span>
                   </div>
-                  <span className="font-display font-semibold text-lg">Lendscape</span>
+                  <span className="font-display font-semibold text-lg">AVSAR</span>
                 </div>
                 <p className="text-sm text-muted-foreground max-w-xs">
                   AI-powered internship recommendations to help you find the perfect career opportunity.
@@ -85,16 +111,16 @@ export default function Page() {
               <div className="space-y-4">
                 <h3 className="font-semibold">Contact</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>support@lendscape.com</p>
+                  <p>support@avsar.com</p>
                   <p>1-800-INTERN-1</p>
                   <p className="text-xs">
-                    © 2024 Lendscape. All rights reserved.
+                    © 2024 AVSAR. All rights reserved.
                   </p>
                 </div>
               </div>
             </div>
           </div>
-        </footer>
+        </motion.footer>
       )}
     </div>
   );
