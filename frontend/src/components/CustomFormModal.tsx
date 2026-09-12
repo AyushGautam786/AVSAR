@@ -309,9 +309,19 @@ const CustomFormModal: React.FC<CustomFormModalProps> = ({
             </div>
 
             {resumeSuccessMsg && (
-              <div className="mt-3 p-3 bg-emerald-100/90 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-semibold flex items-center gap-2 animate-fade-in">
-                <CheckCircle className="h-4 w-4 text-emerald-700 shrink-0" />
-                <span>{resumeSuccessMsg}</span>
+              <div className="mt-3 p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in shadow-xs">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">{resumeSuccessMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onSubmit}
+                  className="btn-primary text-xs font-bold py-1.5 px-3.5 shadow-sm whitespace-nowrap bg-teal-800 hover:bg-teal-900"
+                >
+                  <Brain className="h-3.5 w-3.5" />
+                  Get Matches Now →
+                </button>
               </div>
             )}
           </div>

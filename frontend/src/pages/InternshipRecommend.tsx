@@ -38,6 +38,7 @@ const RecommendationsPage: React.FC = () => {
         fetchRecommendations,
         fetchCustomRecommendations,
         fetchStudentProfile,
+        createOrUpdateStudentProfile,
         parseResumeToProfile,
         logEvent,
     } = useApi();
@@ -98,20 +99,52 @@ const RecommendationsPage: React.FC = () => {
     };
 
     const handleFetchCustomRecommendations = async () => {
-        if (!customForm.preferred_domains.length || !customForm.preferred_locations.length || !customForm.skills.length) {
-            setError('Please fill in all required fields (domains, locations, skills)');
-            return;
-        }
+        // Provide smart defaults so the user is never blocked
+        const domains = customForm.preferred_domains.length > 0
+            ? customForm.preferred_domains
+            : ['Software Engineering', 'Web Development'];
+
+        const locations = customForm.preferred_locations.length > 0
+            ? customForm.preferred_locations
+            : ['Remote'];
+
+        const skills = customForm.skills.length > 0
+            ? customForm.skills
+            : ['Python', 'Problem Solving'];
+
+        const candidateName = customForm.name || (user?.email?.split('@')[0]) || 'Student';
+
+        const finalForm: CustomFormData = {
+            name: candidateName,
+            preferred_domains: domains,
+            preferred_locations: locations,
+            skills: skills,
+            interests: customForm.interests || [],
+        };
 
         setLoading(true);
         setError(null);
 
-        const result = await fetchCustomRecommendations(customForm);
+        // Sync with Supabase student profile if logged in
+        if (user) {
+            try {
+                await createOrUpdateStudentProfile({
+                    name: candidateName,
+                    skills: skills,
+                    preferred_domains: domains,
+                    preferred_locations: locations,
+                });
+            } catch {
+                // Non-fatal
+            }
+        }
+
+        const result = await fetchCustomRecommendations(finalForm);
 
         if (result.data) {
             setRecommendations(result.data);
             setShowCustomForm(false);
-            setSelectedStudent(null); // Clear selected student for custom recommendations
+            setSelectedStudent(null);
         } else if (result.error) {
             setError(result.error);
         }
