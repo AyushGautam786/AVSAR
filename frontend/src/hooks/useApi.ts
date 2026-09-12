@@ -59,12 +59,9 @@ export const useApi = () => {
       // Create a blank profile if none exists
       const newProfile = {
         user_id: user.id,
-        name: user.user_metadata?.full_name || user.email || 'Student',
+        name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Student',
         email: user.email || '',
-        preferred_domains: [],
-        preferred_locations: [],
         skills: [],
-        interests: [],
       };
 
       const { data: createdProfile, error: createError } = await supabase

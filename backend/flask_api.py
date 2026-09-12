@@ -209,15 +209,12 @@ def _get_student_by_user_id(user_id: str) -> dict | None:
         resp = supabase.table("students").select("*").eq("user_id", user_id).execute()
         if resp.data and len(resp.data) > 0:
             return resp.data[0]
-        # Auto-create if not yet created
+        # Auto-create if not yet created (using only valid schema columns)
         new_row = {
             "user_id": user_id,
             "name": "Student",
             "email": "",
             "skills": [],
-            "preferred_domains": [],
-            "preferred_locations": [],
-            "interests": [],
         }
         res = supabase.table("students").insert(new_row).execute()
         return res.data[0] if res.data else None
