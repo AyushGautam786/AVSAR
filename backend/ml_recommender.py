@@ -377,6 +377,19 @@ class MLInternshipRecommender:
         X_scaled = self.scaler.transform(X)
         raw_scores = self.ml_model.predict(X_scaled)
 
+        def _clean_val(v):
+            if v is None or pd.isna(v):
+                return None
+            if isinstance(v, (float, np.floating)):
+                if np.isnan(v) or np.isinf(v):
+                    return None
+                return float(v)
+            if isinstance(v, (int, np.integer)):
+                return int(v)
+            if isinstance(v, (bool, np.bool_)):
+                return bool(v)
+            return v
+
         predictions: list[dict] = []
         for i, (intern_dict, features) in enumerate(intern_rows):
             raw_score = float(raw_scores[i])
@@ -390,19 +403,32 @@ class MLInternshipRecommender:
                 features,
             )
 
+            desc = intern_dict.get("description")
+            desc_str = "" if (desc is None or pd.isna(desc)) else str(desc)[:300]
+            role = intern_dict.get("role_title") or intern_dict.get("title")
+            role_str = "" if (role is None or pd.isna(role)) else str(role)
+            comp = intern_dict.get("company_name")
+            comp_str = "" if (comp is None or pd.isna(comp)) else str(comp)
+            domain = intern_dict.get("domain")
+            domain_str = "" if (domain is None or pd.isna(domain)) else str(domain)
+            loc = intern_dict.get("location")
+            loc_str = "" if (loc is None or pd.isna(loc)) else str(loc)
+            apply_url = intern_dict.get("apply_url")
+            apply_str = None if (apply_url is None or pd.isna(apply_url)) else str(apply_url)
+
             predictions.append({
-                "internship_id": intern_dict.get("id"),
-                "company_name": intern_dict.get("company_name"),
-                "role_title": intern_dict.get("role_title") or intern_dict.get("title"),
-                "domain": intern_dict.get("domain"),
-                "location": intern_dict.get("location"),
-                "is_remote": intern_dict.get("is_remote", False),
+                "internship_id": str(intern_dict.get("id") or ""),
+                "company_name": comp_str,
+                "role_title": role_str,
+                "domain": domain_str,
+                "location": loc_str,
+                "is_remote": bool(intern_dict.get("is_remote", False)),
                 "match_score": match_score,
                 "predicted_rating": round(raw_score, 2),
-                "duration_weeks": intern_dict.get("duration_weeks"),
-                "stipend": intern_dict.get("stipend"),
-                "apply_url": intern_dict.get("apply_url"),
-                "description": (intern_dict.get("description") or "")[:300],
+                "duration_weeks": _clean_val(intern_dict.get("duration_weeks")),
+                "stipend": _clean_val(intern_dict.get("stipend")),
+                "apply_url": apply_str,
+                "description": desc_str,
                 # Phase 7 additions
                 "matched_skills": explanation["matched_skills"],
                 "missing_skills": explanation["missing_skills"],

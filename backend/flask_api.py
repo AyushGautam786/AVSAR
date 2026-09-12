@@ -320,30 +320,48 @@ def get_internships():
         return jsonify({"error": str(exc)}), 500
 
 
+def _sanitize_for_json(obj):
+    """Recursively converts NaN, Infinity, and numpy types to JSON-safe Python primitives."""
+    if obj is None or pd.isna(obj):
+        return None
+    if isinstance(obj, (float, np.floating)):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return float(obj)
+    if isinstance(obj, (int, np.integer)):
+        return int(obj)
+    if isinstance(obj, (bool, np.bool_)):
+        return bool(obj)
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
+
+
 # ── Recommendations ───────────────────────────────────────────────────────────
 
-@app.route("/api/recommendations/<string:student_id>")
+@app.route("/api/recommendations/<student_id>", methods=["GET"])
 @require_auth
+@limiter.limit("30 per minute")
 def get_recommendations(student_id: str):
-    """Get ML-powered recommendations for the authenticated student."""
+    """Get top-N internship recommendations for a student."""
     try:
-        student = _get_student_by_user_id(g.user_id)
+        top_n = min(int(request.args.get("top_n", 10)), 50)
+        student = _get_student(student_id)
         if not student:
-            return jsonify({"error": "Student profile not found"}), 404
+            return jsonify({"error": f"Student '{student_id}' not found"}), 404
 
-        top_n = min(50, max(1, int(request.args.get("limit", 10))))
         internships_df = _get_internships_df()
-
         if internships_df.empty:
             return jsonify({"error": "No internships available"}), 503
-
         if not _model_trained:
             return jsonify({"error": "ML model not ready"}), 503
 
         recommendations = recommender.get_recommendations(
             student, internships_df, top_n=top_n
         )
-        return jsonify(recommendations)
+        return jsonify(_sanitize_for_json(recommendations))
     except Exception as exc:
         log.error("Error generating recommendations for %s: %s", student_id, exc)
         return jsonify({"error": str(exc)}), 500
@@ -386,7 +404,7 @@ def get_custom_recommendations():
             return jsonify({"error": "ML model not ready"}), 503
 
         recommendations = recommender.get_recommendations(profile, internships_df)
-        return jsonify(recommendations)
+        return jsonify(_sanitize_for_json(recommendations))
     except Exception as exc:
         log.error("Error in custom recommendations: %s", exc)
         return jsonify({"error": str(exc)}), 500
