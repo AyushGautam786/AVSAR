@@ -80,6 +80,9 @@ const ResumeTailorPage: React.FC = () => {
     setError(null);
     try {
       const authHeaders = await getAuthHeader();
+      if (!authHeaders.Authorization) {
+        throw new Error('Your session has expired. Please sign in again.');
+      }
       const formData = new FormData();
       formData.append('file', resumeFile);
       const resp = await fetch(`${API_BASE_URL}/api/resume/upload`, {
@@ -87,12 +90,21 @@ const ResumeTailorPage: React.FC = () => {
         headers: authHeaders,
         body: formData,
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Upload failed');
+
+      let data: any = {};
+      try {
+        data = await resp.json();
+      } catch {
+        data = { error: `Server returned status ${resp.status}` };
+      }
+
+      if (!resp.ok) {
+        throw new Error(data.error || `Upload failed (Status ${resp.status})`);
+      }
       setResumeId(data.resume_id);
       setStep('jd');
     } catch (err: any) {
-      setError(err.message || 'Upload failed. Please check your file and try again.');
+      setError(err.message || 'Upload failed. Please check your network and try again.');
     } finally {
       setIsUploading(false);
     }
@@ -107,17 +119,29 @@ const ResumeTailorPage: React.FC = () => {
     setStep('tailoring');
     try {
       const authHeaders = await getAuthHeader();
+      if (!authHeaders.Authorization) {
+        throw new Error('Your session has expired. Please sign in again.');
+      }
       const resp = await fetch(`${API_BASE_URL}/api/resume/tailor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ resume_id: resumeId, job_description_text: jdText }),
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Tailoring failed');
+
+      let data: any = {};
+      try {
+        data = await resp.json();
+      } catch {
+        data = { error: `Server returned status ${resp.status}` };
+      }
+
+      if (!resp.ok) {
+        throw new Error(data.error || `Tailoring failed (Status ${resp.status})`);
+      }
       setResult(data);
       setStep('results');
     } catch (err: any) {
-      setError(err.message || 'Tailoring failed. Please try again.');
+      setError(err.message || 'Tailoring failed. Please check your network and try again.');
       setStep('jd');
     } finally {
       setIsTailoring(false);

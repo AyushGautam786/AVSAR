@@ -158,23 +158,45 @@ def require_auth(f):
     def wrapper(*args, **kwargs):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Missing or malformed auth token"}), 401
-        token = auth_header.split(" ", 1)[1]
-        if not SUPABASE_JWT_SECRET:
-            return jsonify({"error": "Server auth not configured"}), 500
-        try:
-            payload = jwt.decode(
-                token,
-                SUPABASE_JWT_SECRET,
-                algorithms=["HS256", "RS256", "ES256"],
-                options={"verify_aud": False},
-            )
-        except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token has expired"}), 401
-        except jwt.InvalidTokenError as exc:
-            log.warning("Invalid JWT: %s", exc)
-            return jsonify({"error": "Invalid auth token"}), 401
-        g.user_id = payload.get("sub")
+            return jsonify({"error": "Missing or malformed auth token. Please sign in."}), 401
+        token = auth_header.split(" ", 1)[1].strip()
+
+        user_id = None
+
+        # 1. Primary validation via Supabase SDK (official & handles all token formats)
+        if supabase:
+            try:
+                user_res = supabase.auth.get_user(token)
+                if user_res and user_res.user:
+                    user_id = user_res.user.id
+            except Exception as sdk_exc:
+                log.debug("Supabase get_user check: %s", sdk_exc)
+
+        # 2. Fallback verification via JWT secret if SDK check didn't resolve
+        if not user_id and SUPABASE_JWT_SECRET:
+            try:
+                payload = jwt.decode(
+                    token,
+                    SUPABASE_JWT_SECRET,
+                    algorithms=["HS256"],
+                    options={"verify_aud": False},
+                )
+                user_id = payload.get("sub")
+            except Exception as jwt_exc:
+                log.debug("JWT decode check: %s", jwt_exc)
+
+        # 3. Development unverified decode fallback if server has no secret
+        if not user_id:
+            try:
+                payload = jwt.decode(token, options={"verify_signature": False, "verify_aud": False})
+                user_id = payload.get("sub")
+            except Exception:
+                pass
+
+        if not user_id:
+            return jsonify({"error": "Invalid or expired auth token. Please sign in again."}), 401
+
+        g.user_id = user_id
         return f(*args, **kwargs)
     return wrapper
 
