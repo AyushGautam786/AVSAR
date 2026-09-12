@@ -26,27 +26,87 @@ class InternshalaApifyAdapter(JobSourceAdapter):
         config: {
             "categories": ["computer-science", "web-development", ...],
             "cities": ["all-india"],
-            "maxItems": 500
+            "maxItems": 100
         }
         """
         token = os.environ.get("APIFY_TOKEN")
         actor_id = os.environ.get("APIFY_ACTOR_ID")
 
-        if not token or not actor_id:
-            log.warning("Internshala: APIFY_TOKEN or APIFY_ACTOR_ID not set — skipping.")
+        # If Apify token is provided, attempt Apify actor
+        if token and actor_id and "your-apify" not in token:
+            url = f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
+            log.info("Internshala: starting Apify actor %s …", actor_id)
+            try:
+                resp = requests.post(url, params={"token": token}, json=config, timeout=600)
+                resp.raise_for_status()
+                items = resp.json()
+                log.info("Internshala: actor returned %d items.", len(items))
+                if items:
+                    return items
+            except Exception as exc:
+                log.warning("Internshala Apify error: %s — falling back to direct scraper.", exc)
+
+        # ── Direct Free Scraper (No Apify / No Payment Needed) ────────────────
+        log.info("Internshala: fetching public listings directly (free mode) …")
+        return self._fetch_direct(config)
+
+    def _fetch_direct(self, config: dict) -> list[dict]:
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            log.warning("BeautifulSoup not installed. Run: pip install beautifulsoup4")
             return []
 
-        url = f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
-        log.info("Internshala: starting Apify actor %s …", actor_id)
-        try:
-            resp = requests.post(url, params={"token": token}, json=config, timeout=600)
-            resp.raise_for_status()
-            items = resp.json()
-            log.info("Internshala: actor returned %d items.", len(items))
-            return items
-        except Exception as exc:
-            log.error("Internshala Apify error: %s", exc)
-            return []
+        categories = config.get("categories") or ["computer-science-internship", "web-development-internship", "data-science-internship", "marketing-internship", "design-internship"]
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+
+        items: list[dict] = []
+        for cat in categories[:4]:
+            endpoint = cat if cat.startswith("http") else f"https://internshala.com/internships/{cat}"
+            try:
+                resp = requests.get(endpoint, headers=headers, timeout=20)
+                if resp.status_code != 200:
+                    continue
+                soup = BeautifulSoup(resp.text, "html.parser")
+                cards = soup.select(".individual_internship")
+                for card in cards:
+                    try:
+                        title_el = card.select_one(".job-title-href") or card.select_one("h3.job-internship-name") or card.select_one(".heading_4_5")
+                        company_el = card.select_one(".company-name") or card.select_one(".company_name")
+                        loc_el = card.select_one(".row-1-item.locations") or card.select_one(".location_link")
+                        stipend_el = card.select_one(".stipend")
+                        link_el = card.select_one("a.job-title-href") or card.select_one("a.view_detail_button")
+
+                        title = title_el.get_text(strip=True) if title_el else ""
+                        company = company_el.get_text(strip=True) if company_el else ""
+                        location = loc_el.get_text(strip=True) if loc_el else "India"
+                        stipend = stipend_el.get_text(strip=True) if stipend_el else ""
+                        href = link_el.get("href", "") if link_el else ""
+                        apply_url = f"https://internshala.com{href}" if href.startswith("/") else (href or "https://internshala.com/internships")
+
+                        if title and company:
+                            items.append({
+                                "id": f"internshala_{len(items)+1}",
+                                "title": title,
+                                "company": company,
+                                "location": location,
+                                "stipend": stipend,
+                                "url": apply_url,
+                                "is_remote": "work from home" in location.lower(),
+                                "category": cat.replace("-internship", "").replace("-", " ").title(),
+                                "skills": [],
+                            })
+                    except Exception:
+                        continue
+            except Exception as exc:
+                log.warning("Direct fetch error for %s: %s", cat, exc)
+
+        log.info("Internshala: direct scraper gathered %d listings.", len(items))
+        return items
 
     def normalize(self, raw: dict) -> dict:
         location_raw = raw.get("location") or raw.get("city") or ""

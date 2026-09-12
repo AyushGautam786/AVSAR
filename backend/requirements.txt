@@ -11,8 +11,10 @@ python-dotenv
 requests
 # Phase 7 — semantic ML recommender
 sentence-transformers
-# Phase 8 — resume tailoring
+# Phase 8 — resume tailoring & scraping
 pdfplumber
+pypdf
 python-docx
+beautifulsoup4
 anthropic
 # openai  # uncomment if using OpenAI instead of Anthropic
