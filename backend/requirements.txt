@@ -9,8 +9,8 @@ PyJWT
 gunicorn
 python-dotenv
 requests
-# Phase 7 — semantic ML recommender
-sentence-transformers
+# Phase 7 — ML recommender (uses scikit-learn TF-IDF by default; sentence-transformers optional for GPU tiers)
+# sentence-transformers
 # Phase 8 — resume tailoring & scraping
 pdfplumber
 pypdf
