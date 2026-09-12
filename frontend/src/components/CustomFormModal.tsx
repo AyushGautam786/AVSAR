@@ -140,19 +140,19 @@ const CustomFormModal: React.FC<CustomFormModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#20252b]/35 backdrop-blur-sm"
         onClick={() => { setShowCustomForm(false); onReset(); }}
       />
 
-      <div className="relative glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in p-0">
+      <div className="relative glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in p-0 overscroll-contain">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/8 sticky top-0 z-10" style={{ background: '#0d1120' }}>
+        <div className="flex items-center justify-between p-6 border-b border-[#dedbd2] sticky top-0 z-10" style={{ background: '#ffffff' }}>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
               <Brain className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white">Create Your Profile</h2>
+              <h2 className="text-lg font-black text-[#20252b]">Create Your Profile</h2>
               <p className="text-xs text-gray-500">Fill in your preferences to get AI recommendations</p>
             </div>
           </div>
@@ -167,7 +167,7 @@ const CustomFormModal: React.FC<CustomFormModalProps> = ({
         {/* Body */}
         <div className="p-6 space-y-6">
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div className="p-3 rounded-xl bg-[#fff1ef] border border-[#efc4bd] text-[#a9453f] text-sm">
               {error}
             </div>
           )}

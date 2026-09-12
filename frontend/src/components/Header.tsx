@@ -94,8 +94,8 @@ const Header: React.FC<HeaderProps> = ({ user, onSignIn, onSignOut }) => {
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled
-            ? 'bg-[#0a0b14]/95 backdrop-blur-xl border-b border-white/8 shadow-[0_4px_30px_rgba(0,0,0,0.5)]'
-            : 'bg-[#0a0b14]/80 backdrop-blur-md border-b border-white/5'
+            ? 'bg-white/95 backdrop-blur-xl border-b border-[#dedbd2] shadow-[0_4px_24px_rgba(43,49,52,0.08)]'
+            : 'bg-[#f8f7f3]/90 backdrop-blur-md border-b border-[#e8e5dd]'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -119,8 +119,8 @@ const Header: React.FC<HeaderProps> = ({ user, onSignIn, onSignOut }) => {
                     to={to}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                       isActive(to)
-                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                        : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                        ? 'bg-[#edf5f1] text-[#1f5f5b] border border-[#c9dfd9]'
+                        : 'text-gray-400 hover:text-[#1f5f5b] hover:bg-[#f1efe9]'
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -154,7 +154,7 @@ const Header: React.FC<HeaderProps> = ({ user, onSignIn, onSignOut }) => {
 
                   {/* Dropdown */}
                   {userMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-52 glass-card rounded-xl shadow-2xl py-1 animate-scale-in z-50">
+                    <div className="absolute right-0 top-full mt-2 w-56 glass-card rounded-xl shadow-2xl py-1 animate-scale-in z-[1100]">
                       <div className="px-4 py-3 border-b border-white/8">
                         <p className="text-sm font-semibold text-white truncate">{getUserName()}</p>
                         <p className="text-xs text-gray-500 truncate">{user.email}</p>

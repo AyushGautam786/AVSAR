@@ -110,6 +110,7 @@ const InternshipsPage: React.FC = () => {
                     onSave={handleSave}
                     savedIds={savedIds}
                     availableDomains={availableDomains}
+                    activeDomain={activeDomain}
                 />
             </main>
         </div>

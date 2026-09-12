@@ -15,6 +15,7 @@ interface InternshipsTabProps {
   onSave?: (internship: Internship) => Promise<void>;
   savedIds?: Set<string>;
   availableDomains?: string[];
+  activeDomain?: string;
 }
 
 const InternshipsTab: React.FC<InternshipsTabProps> = ({
@@ -28,6 +29,7 @@ const InternshipsTab: React.FC<InternshipsTabProps> = ({
   onSave,
   savedIds = new Set(),
   availableDomains = [],
+  activeDomain = '',
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -77,7 +79,7 @@ const InternshipsTab: React.FC<InternshipsTabProps> = ({
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4 text-gray-500 shrink-0" />
             <DarkSelect
-              value=""
+              value={activeDomain}
               onChange={val => onFilterDomain(val)}
               options={[
                 { value: '', label: 'All Domains' },
