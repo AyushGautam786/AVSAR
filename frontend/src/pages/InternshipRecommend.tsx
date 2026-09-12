@@ -125,19 +125,15 @@ const RecommendationsPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Sync with Supabase student profile if logged in
+        // Sync with Supabase student profile in background (non-blocking)
         if (user) {
-            try {
-                await createOrUpdateStudentProfile({
-                    user_id: user.id,
-                    name: candidateName,
-                    skills: skills,
-                    preferred_domains: domains,
-                    preferred_locations: locations,
-                });
-            } catch {
-                // Non-fatal
-            }
+            createOrUpdateStudentProfile({
+                user_id: user.id,
+                name: candidateName,
+                skills: skills,
+                preferred_domains: domains,
+                preferred_locations: locations,
+            }).catch(() => {});
         }
 
         const result = await fetchCustomRecommendations(finalForm);

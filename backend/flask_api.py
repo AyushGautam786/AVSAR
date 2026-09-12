@@ -43,6 +43,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
 )
 log = logging.getLogger("avsar_api")
+log.info("AVSAR API initializing...")
 
 # ── App setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)

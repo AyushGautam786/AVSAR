@@ -51,15 +51,8 @@ def _get_embedder():
 
 
 def _semantic_sim(text_a: str, text_b: str) -> float:
-    """Cosine similarity between two texts using sentence embeddings (normalized → dot product)."""
-    embedder = _get_embedder()
-    if not _EMBED_AVAILABLE or not embedder or not text_a or not text_b:
-        return 0.0
-    try:
-        vecs = embedder.encode([text_a, text_b], normalize_embeddings=True)
-        return float(np.dot(vecs[0], vecs[1]))
-    except Exception:
-        return 0.0
+    """Fast token-overlap similarity without synchronous per-row neural net encoding lag."""
+    return _tfidf_sim(text_a, text_b)
 
 
 def _tfidf_sim(text_a: str, text_b: str) -> float:
