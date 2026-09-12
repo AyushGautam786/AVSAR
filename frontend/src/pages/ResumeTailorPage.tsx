@@ -8,16 +8,12 @@ import Header from '../components/Header';
 import AtsScoreCard from '../components/AtsScoreCard';
 import DiffViewer from '../components/DiffViewer';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabaseClient';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/['"]/g, '').replace(/\/$/, '');
 
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const { createClient } = await import('@supabase/supabase-js');
-  const sb = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_KEY,
-  );
-  const { data } = await sb.auth.getSession();
+  const { data } = await supabase.auth.getSession();
   const token = data?.session?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

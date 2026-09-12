@@ -17,6 +17,7 @@ Environment variables (see .env.example):
 import os
 import logging
 import tempfile
+import uuid
 from datetime import datetime
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -44,8 +45,18 @@ log = logging.getLogger("avsar_api")
 # ── App setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
-CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "http://localhost:5173")
-CORS(app, origins=[CORS_ORIGIN], supports_credentials=True)
+# Allow all localhost and 127.0.0.1 dev ports, plus any production CORS_ORIGIN configured
+_cors_origins = [
+    r"^https?:\/\/localhost(:\d+)?$",
+    r"^https?:\/\/127\.0\.0\.1(:\d+)?$",
+]
+_env_origin = os.environ.get("CORS_ORIGIN")
+if _env_origin:
+    for o in _env_origin.split(","):
+        if o.strip():
+            _cors_origins.append(o.strip())
+
+CORS(app, origins=_cors_origins, supports_credentials=True)
 
 limiter = Limiter(
     get_remote_address,
