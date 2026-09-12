@@ -252,6 +252,32 @@ export const useApi = () => {
     return { data: students };
   }, [students]);
 
+  const parseResumeToProfile = useCallback(async (file: File): Promise<ApiResponse<any>> => {
+    try {
+      const authHeaders = await getAuthHeader();
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API_BASE_URL}/api/resume/parse-profile`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData,
+      });
+
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { error: `Server returned status ${response.status}` };
+      }
+
+      if (!response.ok) throw new Error(data.error || `Failed to parse resume (Status ${response.status})`);
+      return { data: data.profile };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Failed to parse resume' };
+    }
+  }, []);
+
   return {
     students,
     internships,
@@ -265,6 +291,7 @@ export const useApi = () => {
     fetchStudents,
     fetchStudentProfile,
     createOrUpdateStudentProfile,
+    parseResumeToProfile,
     fetchInternships,
     fetchStats,
     fetchAvailableOptions,

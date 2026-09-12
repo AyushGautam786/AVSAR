@@ -38,6 +38,7 @@ const RecommendationsPage: React.FC = () => {
         fetchRecommendations,
         fetchCustomRecommendations,
         fetchStudentProfile,
+        parseResumeToProfile,
         logEvent,
     } = useApi();
 
@@ -191,6 +192,7 @@ const RecommendationsPage: React.FC = () => {
                     onCustomFormReset={resetCustomForm}
                     customFormError={error}
                     onApply={handleApply}
+                    onParseResume={parseResumeToProfile}
                 />
             </main>
         </div>

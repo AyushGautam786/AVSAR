@@ -719,6 +719,116 @@ def upload_resume():
         return jsonify({"error": str(exc)}), 500
 
 
+@app.route("/api/resume/parse-profile", methods=["POST"])
+@require_auth
+def parse_resume_to_profile():
+    """
+    Extract skills, domains, locations, education, and name from an uploaded resume using LLM.
+    Automatically updates the authenticated user's student profile in Supabase and returns the extracted fields.
+    """
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+        file = request.files["file"]
+        if not file.filename:
+            return jsonify({"error": "Empty filename"}), 400
+
+        student = _get_student_by_user_id(g.user_id)
+        if not student:
+            return jsonify({"error": "Student profile not found"}), 404
+
+        filename = secure_filename(file.filename)
+        suffix = os.path.splitext(filename)[1].lower()
+
+        if suffix not in (".pdf", ".docx", ".doc", ".txt"):
+            return jsonify({"error": "Only .pdf, .docx, and .txt files are supported"}), 400
+
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+
+        parsed_text = ""
+        try:
+            from resume_tailor.pipeline import extract_text
+            parsed_text = extract_text(tmp_path)
+        except Exception as exc:
+            log.warning("Resume text extraction failed: %s", exc)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+        if not parsed_text or len(parsed_text.strip()) < 20:
+            return jsonify({"error": "Could not extract text from the uploaded resume"}), 400
+
+        # LLM structured profile extraction
+        from resume_tailor.llm_client import chat
+        system = (
+            "You are an expert HR and technical recruiter parser. "
+            "Extract profile details from the candidate resume below. "
+            "Return ONLY valid JSON matching this exact schema — no commentary, no markdown:\n"
+            "{\n"
+            '  "name": "Candidate Full Name",\n'
+            '  "skills": ["Skill 1", "Skill 2", ...],\n'
+            '  "preferred_domains": ["Domain 1", "Domain 2", ...],\n'
+            '  "preferred_locations": ["Location 1", "Remote", ...],\n'
+            '  "education_level": "Degree / Field",\n'
+            '  "interests": ["Interest 1", ...]\n'
+            "}"
+        )
+        profile_json = {}
+        try:
+            response = chat(system, parsed_text[:8000], max_tokens=1000)
+            match = re.search(r"\{.*\}", response, re.DOTALL)
+            if match:
+                profile_json = json.loads(match.group())
+        except Exception as exc:
+            log.warning("LLM profile parsing failed: %s", exc)
+
+        # Merge extracted profile with defaults
+        extracted_skills = profile_json.get("skills", [])
+        if not isinstance(extracted_skills, list):
+            extracted_skills = [str(extracted_skills)]
+
+        extracted_domains = profile_json.get("preferred_domains", [])
+        if not isinstance(extracted_domains, list):
+            extracted_domains = [str(extracted_domains)]
+
+        extracted_locations = profile_json.get("preferred_locations", [])
+        if not isinstance(extracted_locations, list):
+            extracted_locations = [str(extracted_locations)]
+
+        extracted_name = profile_json.get("name") or student.get("name") or "Student"
+        extracted_education = profile_json.get("education_level") or student.get("education_level") or ""
+
+        # Update Supabase student record
+        if supabase:
+            update_payload = {
+                "name": extracted_name,
+                "skills": extracted_skills[:30],
+                "education_level": extracted_education,
+            }
+            supabase.table("students").update(update_payload).eq("id", student["id"]).execute()
+
+        return jsonify({
+            "success": True,
+            "profile": {
+                "name": extracted_name,
+                "skills": extracted_skills,
+                "preferred_domains": extracted_domains,
+                "preferred_locations": extracted_locations,
+                "education_level": extracted_education,
+                "interests": profile_json.get("interests", []),
+            },
+            "message": f"Extracted {len(extracted_skills)} skills and profile details from resume successfully!"
+        })
+
+    except Exception as exc:
+        log.error("Resume parse-profile error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route("/api/resume/tailor", methods=["POST"])
 @require_auth
 @limiter.limit("5 per hour")

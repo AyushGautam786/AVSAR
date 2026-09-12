@@ -23,6 +23,7 @@ interface RecommendationsTabProps {
   onCustomFormReset: () => void;
   customFormError: string | null;
   onApply?: (internshipId: string, applyUrl?: string) => void;
+  onParseResume?: (file: File) => Promise<{ data?: any; error?: string }>;
 }
 
 const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
@@ -41,6 +42,7 @@ const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
   onCustomFormReset,
   customFormError,
   onApply,
+  onParseResume,
 }) => {
   return (
     <div className="workspace recommendations-workspace space-y-8">
@@ -172,6 +174,7 @@ const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
         onSubmit={onCustomFormSubmit}
         onReset={onCustomFormReset}
         error={customFormError}
+        onParseResume={onParseResume}
       />
     </div>
   );
