@@ -15,6 +15,7 @@ sentence-transformers
 pdfplumber
 pypdf
 python-docx
+reportlab
 beautifulsoup4
 anthropic
 # openai  # uncomment if using OpenAI instead of Anthropic

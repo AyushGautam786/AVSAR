@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Upload, Zap, Download, AlertTriangle, CheckCircle,
-  ChevronRight, Loader2, X, Sparkles, RefreshCw, FileCheck
+  Upload, Zap, AlertTriangle, CheckCircle,
+  ChevronRight, Loader2, X, Sparkles, RefreshCw, FileCheck,
+  FileText, Eye, FileDown, Layers
 } from 'lucide-react';
 import Header from '../components/Header';
 import AtsScoreCard from '../components/AtsScoreCard';
 import DiffViewer from '../components/DiffViewer';
+import ResumePreview from '../components/ResumePreview';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabaseClient';
 
@@ -19,6 +21,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 }
 
 type Step = 'upload' | 'jd' | 'tailoring' | 'results';
+type ResultsTab = 'preview' | 'diff' | 'keywords';
 
 interface TailorResult {
   ats_score_before: number;
@@ -27,6 +30,9 @@ interface TailorResult {
   diff: any[];
   fabrication_flags: string[];
   download_url: string | null;
+  download_url_pdf?: string | null;
+  rewritten_sections?: Record<string, string[]>;
+  original_sections?: Record<string, string[]>;
 }
 
 const ResumeTailorPage: React.FC = () => {
@@ -34,6 +40,7 @@ const ResumeTailorPage: React.FC = () => {
   const { user, loading: authLoading, signOut } = useAuth();
 
   const [step, setStep] = useState<Step>('upload');
+  const [resultsTab, setResultsTab] = useState<ResultsTab>('preview');
   const [isDragging, setIsDragging] = useState(false);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeId, setResumeId] = useState<string | null>(null);
@@ -364,18 +371,23 @@ const ResumeTailorPage: React.FC = () => {
         {/* ── Step 4: Results ── */}
         {step === 'results' && result && (
           <div className="space-y-6 animate-scale-in">
-            {/* ATS Scores */}
+            {/* ATS Scores Overview Card */}
             <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm">
-              <div className="mb-6">
-                <h2 className="text-xl font-black text-slate-900 mb-1" style={{ fontFamily: 'var(--font-display)' }}>
-                  ATS Keyword Coverage Analysis
-                </h2>
+              <div className="mb-6 text-center sm:text-left">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+                  <h2 className="text-xl font-black text-slate-900" style={{ fontFamily: 'var(--font-display)' }}>
+                    ATS Keyword & Experience Uplift
+                  </h2>
+                  <span className="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+                    +{(result.ats_score_after - result.ats_score_before).toFixed(1)}% Match Increase
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500 font-medium">
-                  Comparison of keyword match density against the target job requirements before and after tailoring.
+                  Keyword match density calculated directly against the target job requirements before and after AI alignment.
                 </p>
               </div>
 
-              <div className="flex gap-6 justify-center flex-wrap mb-6">
+              <div className="flex gap-6 justify-center flex-wrap">
                 <AtsScoreCard label="Original Resume Match" score={result.ats_score_before} />
                 <AtsScoreCard
                   label="Tailored Resume Match"
@@ -384,66 +396,155 @@ const ResumeTailorPage: React.FC = () => {
                   isAfter
                 />
               </div>
+            </div>
 
-              {result.jd_keywords.length > 0 && (
-                <div className="pt-4 border-t border-slate-200">
-                  <p className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">
-                    Extracted Keywords ({result.jd_keywords.length})
+            {/* Results Tab Navigation */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-1 overflow-x-auto">
+              <button
+                onClick={() => setResultsTab('preview')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                  resultsTab === 'preview'
+                    ? 'bg-teal-800 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Eye className="h-4 w-4" />
+                Resume Live Preview
+              </button>
+              <button
+                onClick={() => setResultsTab('diff')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                  resultsTab === 'diff'
+                    ? 'bg-teal-800 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                Bullet Refinements & Diff
+                {result.diff.length > 0 && (
+                  <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                    resultsTab === 'diff' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {result.diff.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setResultsTab('keywords')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                  resultsTab === 'keywords'
+                    ? 'bg-teal-800 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Sparkles className="h-4 w-4" />
+                Keywords ({result.jd_keywords.length})
+              </button>
+            </div>
+
+            {/* Tab 1: Live Resume Document Preview */}
+            {resultsTab === 'preview' && (
+              <ResumePreview
+                rewrittenSections={result.rewritten_sections}
+                originalSections={result.original_sections}
+                diff={result.diff}
+                downloadUrlDocx={result.download_url}
+                downloadUrlPdf={result.download_url_pdf}
+                candidateName={user.email?.split('@')[0] || 'Student Resume'}
+              />
+            )}
+
+            {/* Tab 2: Line-by-line Diff */}
+            {resultsTab === 'diff' && (
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
+                <div className="mb-2">
+                  <h3 className="text-lg font-black text-slate-900 mb-1" style={{ fontFamily: 'var(--font-display)' }}>
+                    Bullet Points & Section Refinements
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    See exact line-by-line enhancements made to emphasize your existing skills with zero fabrication.
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {result.jd_keywords.slice(0, 25).map(kw => (
-                      <span
-                        key={kw}
-                        className="px-2.5 py-1 bg-teal-50 text-teal-800 rounded-lg text-xs font-semibold border border-teal-200"
-                      >
-                        {kw}
-                      </span>
-                    ))}
-                    {result.jd_keywords.length > 25 && (
-                      <span className="px-2.5 py-1 text-slate-600 text-xs bg-slate-100 rounded-lg border border-slate-200 font-medium">
-                        +{result.jd_keywords.length - 25} more
-                      </span>
-                    )}
+                </div>
+                <DiffViewer diff={result.diff} fabricationFlags={result.fabrication_flags} />
+              </div>
+            )}
+
+            {/* Tab 3: Keywords Coverage */}
+            {resultsTab === 'keywords' && (
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 mb-1" style={{ fontFamily: 'var(--font-display)' }}>
+                    Extracted Job Description Keywords ({result.jd_keywords.length})
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mb-4">
+                    High-impact skill tokens and technologies identified by the AI in the target job description.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {result.jd_keywords.map(kw => (
+                    <span
+                      key={kw}
+                      className="px-3 py-1.5 bg-teal-50 text-teal-900 rounded-lg text-xs font-bold border border-teal-200/90 shadow-2xs"
+                    >
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Dual Download Action Card */}
+            <div className="rounded-2xl p-6 sm:p-8 border border-emerald-300 bg-emerald-50/70 shadow-sm">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="font-bold text-slate-900 text-base">Download Tailored Resume</h3>
                   </div>
+                  <p className="text-xs text-slate-600 mt-1 max-w-lg leading-relaxed">
+                    ATS-compliant single-column layout · Standard typography · Available in instant PDF and editable Microsoft Word format.
+                  </p>
                 </div>
-              )}
-            </div>
 
-            {/* Diff viewer */}
-            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm">
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-900 mb-1" style={{ fontFamily: 'var(--font-display)' }}>
-                  Bullet Points & Section Refinements
-                </h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  See exact line-by-line enhancements made to emphasize your existing skills.
-                </p>
-              </div>
-              <DiffViewer diff={result.diff} fabricationFlags={result.fabrication_flags} />
-            </div>
+                <div className="flex items-center gap-3 w-full md:w-auto flex-wrap sm:flex-nowrap">
+                  {/* PDF Download Button */}
+                  {result.download_url_pdf ? (
+                    <a
+                      href={result.download_url_pdf}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-primary flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold shadow-md rounded-xl"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Download PDF (.pdf)
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => window.print()}
+                      className="btn-primary flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold shadow-md rounded-xl"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Print / Save as PDF
+                    </button>
+                  )}
 
-            {/* Download */}
-            <div className="rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-4 border border-emerald-300 bg-emerald-50/70 shadow-sm">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Download Tailored Resume</h3>
-                <p className="text-xs text-slate-600 mt-1">
-                  ATS-compliant single-column layout · Standard typography · Instant download
-                </p>
-              </div>
-              {result.download_url ? (
-                <a
-                  href={result.download_url}
-                  download
-                  className="btn-primary flex items-center gap-2 px-6 py-3.5 text-sm font-semibold shrink-0 shadow-md"
-                >
-                  <Download className="h-4 w-4" />
-                  Download .docx File
-                </a>
-              ) : (
-                <div className="text-xs font-semibold text-amber-800 bg-amber-100 px-4 py-2.5 rounded-xl border border-amber-300">
-                  Download link generating or storage ready
+                  {/* DOCX Download Button */}
+                  {result.download_url && (
+                    <a
+                      href={result.download_url}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-secondary flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold border border-slate-300 rounded-xl"
+                    >
+                      <FileText className="h-4 w-4 text-slate-700" />
+                      Download Word (.docx)
+                    </a>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Start over */}
@@ -455,6 +556,7 @@ const ResumeTailorPage: React.FC = () => {
                 setJdText('');
                 setResult(null);
                 setError(null);
+                setResultsTab('preview');
               }}
               className="btn-secondary w-full py-3.5 text-sm font-semibold flex items-center justify-center gap-2"
             >

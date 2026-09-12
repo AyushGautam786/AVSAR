@@ -248,7 +248,7 @@ def check_no_fabrication(original_text: str, rewritten_text: str) -> list[str]:
     return suspicious
 
 
-# ── 6. Render ATS-safe .docx ──────────────────────────────────────────────────
+# ── 6. Render ATS-safe .docx & .pdf ─────────────────────────────────────────
 
 def render_docx(rewritten_sections: dict, output_path: str) -> str:
     """
@@ -300,7 +300,124 @@ def render_docx(rewritten_sections: dict, output_path: str) -> str:
         doc.add_paragraph()  # spacing between sections
 
     doc.save(output_path)
-    log.info("Tailored resume saved to %s", output_path)
+    log.info("Tailored resume docx saved to %s", output_path)
+    return output_path
+
+
+def render_pdf(rewritten_sections: dict, output_path: str) -> str:
+    """
+    Render the tailored resume as an ATS-safe, beautifully formatted PDF using reportlab.
+    """
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from xml.sax.saxutils import escape
+    except ImportError:
+        log.warning("reportlab not installed. Skipping PDF rendering.")
+        return ""
+
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'ResumeTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor('#0d4f4b'),
+        alignment=1,
+        spaceAfter=4,
+    )
+
+    subtitle_style = ParagraphStyle(
+        'ResumeSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=13,
+        textColor=colors.HexColor('#475569'),
+        alignment=1,
+        spaceAfter=12,
+    )
+
+    heading_style = ParagraphStyle(
+        'ResumeSectionHeading',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=15,
+        textColor=colors.HexColor('#0d4f4b'),
+        spaceBefore=8,
+        spaceAfter=4,
+    )
+
+    bullet_style = ParagraphStyle(
+        'ResumeBullet',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=13.5,
+        textColor=colors.HexColor('#1e293b'),
+        leftIndent=14,
+        firstLineIndent=-14,
+        spaceAfter=3,
+    )
+
+    story = []
+
+    # Handle Header section specially if present
+    header_lines = rewritten_sections.get("header", [])
+    if header_lines:
+        name_line = header_lines[0] if header_lines else "Resume"
+        contact_line = " | ".join(header_lines[1:]) if len(header_lines) > 1 else ""
+        story.append(Paragraph(escape(name_line), title_style))
+        if contact_line:
+            story.append(Paragraph(escape(contact_line), subtitle_style))
+        else:
+            story.append(Spacer(1, 8))
+
+    for section_name, bullets in rewritten_sections.items():
+        if section_name.lower() == "header":
+            continue
+        if not bullets:
+            continue
+
+        clean_heading = section_name.replace("_", " ").upper()
+        story.append(Paragraph(f"<b>{escape(clean_heading)}</b>", heading_style))
+
+        # Divider line
+        divider = Table([[""]], colWidths=[540], rowHeights=[1.5])
+        divider.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#cbd5e1')),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        story.append(divider)
+        story.append(Spacer(1, 5))
+
+        for bullet in bullets:
+            b_text = bullet.strip()
+            if not b_text:
+                continue
+            if b_text.startswith("•") or b_text.startswith("-") or b_text.startswith("*"):
+                b_text = b_text.lstrip("•-* ").strip()
+            story.append(Paragraph(f"&bull; {escape(b_text)}", bullet_style))
+
+        story.append(Spacer(1, 6))
+
+    doc.build(story)
+    log.info("Tailored PDF resume saved to %s", output_path)
     return output_path
 
 
@@ -312,7 +429,7 @@ def run_tailoring_pipeline(
     output_dir: str | None = None,
 ) -> dict:
     """
-    End-to-end pipeline: extract → score → rewrite → guard → render.
+    End-to-end pipeline: extract → score → rewrite → guard → render docx & pdf.
     Returns a dict with all results needed by the API endpoint.
     """
     if output_dir is None:
@@ -358,12 +475,20 @@ def run_tailoring_pipeline(
                     "rewritten": new,
                 })
 
-    # Step 8: Render .docx
-    output_filename = f"tailored_resume_{os.path.basename(resume_file_path)}"
-    if not output_filename.endswith(".docx"):
-        output_filename = output_filename.rsplit(".", 1)[0] + "_tailored.docx"
-    output_path = os.path.join(output_dir, output_filename)
-    render_docx(rewritten_sections, output_path)
+    # Step 8: Render .docx and .pdf
+    base_name = os.path.basename(resume_file_path).rsplit(".", 1)[0]
+    docx_filename = f"tailored_{base_name}.docx"
+    pdf_filename = f"tailored_{base_name}.pdf"
+
+    docx_path = os.path.join(output_dir, docx_filename)
+    pdf_path = os.path.join(output_dir, pdf_filename)
+
+    render_docx(rewritten_sections, docx_path)
+    try:
+        render_pdf(rewritten_sections, pdf_path)
+    except Exception as exc:
+        log.warning("PDF rendering error: %s", exc)
+        pdf_path = None
 
     return {
         "ats_score_before": score_before,
@@ -371,6 +496,8 @@ def run_tailoring_pipeline(
         "jd_keywords": jd_keywords,
         "diff": diff,
         "fabrication_flags": fabrication_flags,
-        "tailored_file_path": output_path,
+        "tailored_file_path": docx_path,
+        "tailored_pdf_path": pdf_path if pdf_path and os.path.exists(pdf_path) else None,
         "rewritten_sections": rewritten_sections,
+        "original_sections": resume_sections,
     }

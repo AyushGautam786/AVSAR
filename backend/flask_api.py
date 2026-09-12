@@ -814,21 +814,37 @@ def tailor_resume():
             except Exception:
                 pass
 
-        # Upload tailored file to storage and get a signed URL
-        signed_url = None
+        # Upload tailored files (docx and pdf) to storage and get signed URLs
+        signed_url_docx = None
+        signed_url_pdf = None
         tailored_storage_path = None
         tailored_file = result.get("tailored_file_path")
-        if tailored_file and supabase:
-            tailored_storage_path = f"{g.user_id}/tailored_{os.path.basename(tailored_file)}"
-            try:
-                with open(tailored_file, "rb") as tb:
-                    supabase.storage.from_(RESUME_BUCKET).upload(tailored_storage_path, tb)
-                signed = supabase.storage.from_(RESUME_BUCKET).create_signed_url(
-                    tailored_storage_path, 3600  # 1 hour expiry
-                )
-                signed_url = signed.get("signedURL")
-            except Exception as exc:
-                log.warning("Could not upload tailored file to storage: %s", exc)
+        tailored_pdf_file = result.get("tailored_pdf_path")
+
+        if supabase:
+            if tailored_file and os.path.exists(tailored_file):
+                tailored_storage_path = f"{g.user_id}/tailored_{os.path.basename(tailored_file)}"
+                try:
+                    with open(tailored_file, "rb") as tb:
+                        supabase.storage.from_(RESUME_BUCKET).upload(tailored_storage_path, tb)
+                    signed = supabase.storage.from_(RESUME_BUCKET).create_signed_url(
+                        tailored_storage_path, 3600  # 1 hour expiry
+                    )
+                    signed_url_docx = signed.get("signedURL")
+                except Exception as exc:
+                    log.warning("Could not upload tailored docx file to storage: %s", exc)
+
+            if tailored_pdf_file and os.path.exists(tailored_pdf_file):
+                pdf_storage_path = f"{g.user_id}/tailored_{os.path.basename(tailored_pdf_file)}"
+                try:
+                    with open(tailored_pdf_file, "rb") as tb:
+                        supabase.storage.from_(RESUME_BUCKET).upload(pdf_storage_path, tb)
+                    signed_pdf = supabase.storage.from_(RESUME_BUCKET).create_signed_url(
+                        pdf_storage_path, 3600  # 1 hour expiry
+                    )
+                    signed_url_pdf = signed_pdf.get("signedURL")
+                except Exception as exc:
+                    log.warning("Could not upload tailored pdf file to storage: %s", exc)
 
         # Update tailoring request row
         if supabase and request_row_id:
@@ -848,8 +864,11 @@ def tailor_resume():
             "jd_keywords": result["jd_keywords"],
             "diff": result["diff"],
             "fabrication_flags": result["fabrication_flags"],
-            "download_url": signed_url,
+            "download_url": signed_url_docx,
+            "download_url_pdf": signed_url_pdf,
             "download_url_expires_in_seconds": 3600,
+            "rewritten_sections": result.get("rewritten_sections", {}),
+            "original_sections": result.get("original_sections", {}),
         })
 
     except Exception as exc:
@@ -876,7 +895,7 @@ def get_tailoring_status(request_id: str):
             "diff": row.get("diff", []),
             "error_message": row.get("error_message"),
         }
-        # Generate fresh signed URL if done
+        # Generate fresh signed URLs if done
         if row.get("status") == "done" and row.get("tailored_storage_path"):
             try:
                 signed = supabase.storage.from_(RESUME_BUCKET).create_signed_url(
@@ -884,6 +903,14 @@ def get_tailoring_status(request_id: str):
                 )
                 result["download_url"] = signed.get("signedURL")
                 result["download_url_expires_in_seconds"] = 3600
+                
+                # Check for PDF equivalent
+                pdf_path = row["tailored_storage_path"].rsplit(".", 1)[0] + ".pdf"
+                try:
+                    signed_pdf = supabase.storage.from_(RESUME_BUCKET).create_signed_url(pdf_path, 3600)
+                    result["download_url_pdf"] = signed_pdf.get("signedURL")
+                except Exception:
+                    pass
             except Exception:
                 pass
         return jsonify(result)
