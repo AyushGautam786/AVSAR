@@ -96,8 +96,9 @@ def _groq_chat(system_prompt: str, user_message: str, max_tokens: int) -> str:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
+    model = os.environ.get("GROQ_MODEL", "groq/compound-mini")
     payload = {
-        "model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+        "model": model,
         "max_tokens": max_tokens,
         "temperature": 0.2,
         "messages": [
@@ -111,7 +112,11 @@ def _groq_chat(system_prompt: str, user_message: str, max_tokens: int) -> str:
         raise RuntimeError(f"Groq API error ({resp.status_code}): {resp.text}")
 
     data = resp.json()
-    return data["choices"][0]["message"]["content"]
+    content = data["choices"][0]["message"]["content"]
+    # Strip any <think> reasoning tags if present
+    import re
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+    return content
 
 
 # ── 3. OpenRouter Free Tier ───────────────────────────────────────────────────
