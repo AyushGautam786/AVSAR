@@ -17,7 +17,11 @@ interface PaginatedInternships {
 }
 
 // Reads from env var — set VITE_API_URL=http://localhost:5000 in .env for local dev
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+  .toString()
+  .trim()
+  .replace(/['"]/g, '')
+  .replace(/\/+$/, '');
 
 /** Returns the Bearer token for the current Supabase session, or null. */
 async function getAuthHeader(): Promise<Record<string, string>> {
