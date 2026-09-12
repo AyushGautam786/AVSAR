@@ -743,14 +743,17 @@ def parse_resume_to_profile():
         if suffix not in (".pdf", ".docx", ".doc", ".txt"):
             return jsonify({"error": "Only .pdf, .docx, and .txt files are supported"}), 400
 
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            file.save(tmp.name)
-            tmp_path = tmp.name
+        tmp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        tmp_path = tmp_file.name
+        tmp_file.close()
+
+        file.save(tmp_path)
 
         parsed_text = ""
         try:
             from resume_tailor.pipeline import extract_text
             parsed_text = extract_text(tmp_path)
+            log.info("Extracted %d chars of text from resume %s", len(parsed_text), filename)
         except Exception as exc:
             log.warning("Resume text extraction failed: %s", exc)
         finally:
@@ -759,22 +762,22 @@ def parse_resume_to_profile():
             except Exception:
                 pass
 
-        if not parsed_text or len(parsed_text.strip()) < 20:
-            return jsonify({"error": "Could not extract text from the uploaded resume"}), 400
+        if not parsed_text or len(parsed_text.strip()) < 10:
+            return jsonify({"error": "Could not extract readable text from the uploaded file"}), 400
 
         # LLM structured profile extraction
         from resume_tailor.llm_client import chat
         system = (
-            "You are an expert HR and technical recruiter parser. "
-            "Extract profile details from the candidate resume below. "
-            "Return ONLY valid JSON matching this exact schema — no commentary, no markdown:\n"
+            "You are an expert HR parser. "
+            "Extract candidate details from the resume below. "
+            "Return ONLY valid JSON matching this schema — no markdown, no explanation:\n"
             "{\n"
             '  "name": "Candidate Full Name",\n'
-            '  "skills": ["Skill 1", "Skill 2", ...],\n'
-            '  "preferred_domains": ["Domain 1", "Domain 2", ...],\n'
-            '  "preferred_locations": ["Location 1", "Remote", ...],\n'
-            '  "education_level": "Degree / Field",\n'
-            '  "interests": ["Interest 1", ...]\n'
+            '  "skills": ["Skill1", "Skill2", ...],\n'
+            '  "preferred_domains": ["Domain1", ...],\n'
+            '  "preferred_locations": ["Location1", ...],\n'
+            '  "education_level": "Degree / Qualification",\n'
+            '  "interests": ["Interest1", ...]\n'
             "}"
         )
         profile_json = {}
@@ -787,36 +790,37 @@ def parse_resume_to_profile():
             if match:
                 profile_json = json.loads(match.group())
         except Exception as exc:
-            log.warning("LLM profile parsing failed (%s) — falling back to keyword extractor.", exc)
+            log.warning("LLM profile parsing failed (%s) — falling back to heuristic extractor.", exc)
 
         extracted_skills = profile_json.get("skills", [])
         if not isinstance(extracted_skills, list):
-            extracted_skills = [str(extracted_skills)]
+            extracted_skills = [str(extracted_skills)] if extracted_skills else []
 
         # ── Fallback Heuristic Matcher: Extract skills and domains if LLM returned empty ──
         if len(extracted_skills) == 0:
             KNOWN_SKILLS = [
-                "Python", "JavaScript", "TypeScript", "React", "React Native", "Next.js", "Node.js",
-                "Express", "Django", "Flask", "FastAPI", "Java", "Spring Boot", "C++", "C#", ".NET",
-                "Golang", "Rust", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "AWS", "Azure",
-                "GCP", "Docker", "Kubernetes", "Linux", "Git", "GitHub", "HTML", "CSS", "Tailwind CSS",
-                "Machine Learning", "Deep Learning", "NLP", "Computer Vision", "TensorFlow", "PyTorch",
-                "Scikit-Learn", "Pandas", "NumPy", "REST APIs", "GraphQL", "Data Analysis", "Tableau",
-                "Power BI", "Figma", "UI/UX", "Agile", "DevOps", "CI/CD", "Cybersecurity", "Blockchain"
+                "Python", "JavaScript", "TypeScript", "React", "React.js", "React Native", "Next.js", "Node.js",
+                "Express", "Express.js", "Django", "Flask", "FastAPI", "Java", "Spring Boot", "C++", "C", "C#", ".NET",
+                "Golang", "Go", "Rust", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "AWS", "Azure",
+                "GCP", "Docker", "Kubernetes", "Linux", "Git", "GitHub", "HTML", "HTML5", "CSS", "CSS3", "Tailwind", "Tailwind CSS",
+                "Machine Learning", "Deep Learning", "NLP", "Computer Vision", "TensorFlow", "PyTorch", "Keras",
+                "Scikit-Learn", "Pandas", "NumPy", "REST", "REST APIs", "GraphQL", "Data Analysis", "Tableau",
+                "Power BI", "Figma", "UI/UX", "Agile", "DevOps", "CI/CD", "Cybersecurity", "Blockchain", "Solidity",
+                "Data Science", "Cloud Computing", "Artificial Intelligence", "Generative AI", "NLP", "LLM"
             ]
             found_skills = []
             text_lower = parsed_text.lower()
             for s in KNOWN_SKILLS:
-                pattern = r"\b" + re.escape(s.lower()) + r"\b"
+                pattern = r"(?<!\w)" + re.escape(s.lower()) + r"(?!\w)"
                 if re.search(pattern, text_lower):
                     found_skills.append(s)
-            extracted_skills = found_skills
+            extracted_skills = list(dict.fromkeys(found_skills))  # deduplicate preserving order
 
         extracted_domains = profile_json.get("preferred_domains", [])
         if not isinstance(extracted_domains, list) or len(extracted_domains) == 0:
             KNOWN_DOMAINS = [
                 "Web Development", "Software Engineering", "Data Science", "Machine Learning",
-                "Mobile App Development", "Cloud & DevOps", "Cybersecurity", "UI/UX Design"
+                "Mobile App Development", "Cloud & DevOps", "Cybersecurity", "UI/UX Design", "Artificial Intelligence"
             ]
             found_domains = []
             text_lower = parsed_text.lower()
@@ -844,7 +848,12 @@ def parse_resume_to_profile():
                 "skills": extracted_skills[:30],
                 "education_level": extracted_education,
             }
-            supabase.table("students").update(update_payload).eq("id", student["id"]).execute()
+            try:
+                supabase.table("students").update(update_payload).eq("id", student["id"]).execute()
+            except Exception as exc:
+                log.warning("Could not update students table: %s", exc)
+
+        log.info("Successfully returning %d skills for student %s", len(extracted_skills), student["id"])
 
         return jsonify({
             "success": True,

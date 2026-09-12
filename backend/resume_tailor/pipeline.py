@@ -61,6 +61,17 @@ def extract_text(file_path: str) -> str:
             except Exception as exc:
                 log.warning("pypdf extraction failed: %s", exc)
 
+        # 3. Fallback raw text stream extraction if both libraries returned blank
+        if not text:
+            try:
+                with open(str(path), "rb") as f:
+                    content = f.read().decode("latin1", errors="ignore")
+                    matches = re.findall(r"\(([^\(\)\\\n]{2,})\)", content)
+                    if matches:
+                        text = " ".join(matches).strip()
+            except Exception:
+                pass
+
         return text
 
     elif suffix in (".txt", ".md"):
