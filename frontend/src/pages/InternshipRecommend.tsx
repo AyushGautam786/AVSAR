@@ -38,6 +38,7 @@ const RecommendationsPage: React.FC = () => {
         fetchRecommendations,
         fetchCustomRecommendations,
         fetchStudentProfile,
+        logEvent,
     } = useApi();
 
     // Redirect to landing page if not authenticated
@@ -75,7 +76,7 @@ const RecommendationsPage: React.FC = () => {
         }
     }, [user, currentStudent]);
 
-    const handleFetchRecommendations = async (studentId: number) => {
+    const handleFetchRecommendations = async (studentId: string) => {
         setLoading(true);
         setError(null);
 
@@ -88,6 +89,11 @@ const RecommendationsPage: React.FC = () => {
         }
 
         setLoading(false);
+    };
+
+    const handleApply = async (internshipId: string, _applyUrl?: string) => {
+        // Log the apply event to feed the ML feedback loop
+        await logEvent(internshipId, 'apply');
     };
 
     const handleFetchCustomRecommendations = async () => {
@@ -139,10 +145,10 @@ const RecommendationsPage: React.FC = () => {
     // Show loading spinner while checking auth state
     if (authLoading) {
         return (
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-background)' }}>
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+                    <p className="mt-4 text-gray-500 text-sm">Loading...</p>
                 </div>
             </div>
         );
@@ -154,14 +160,14 @@ const RecommendationsPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100">
+        <div className="page-container">
             <Header
                 user={user}
                 onSignOut={handleSignOut}
                 onSignIn={signInWithGoogle}
             />
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-28">
+            <main className="page-main">
                 {error && (
                     <ErrorAlert error={error} onClose={() => setError(null)} />
                 )}
@@ -184,6 +190,7 @@ const RecommendationsPage: React.FC = () => {
                     onCustomFormSubmit={handleFetchCustomRecommendations}
                     onCustomFormReset={resetCustomForm}
                     customFormError={error}
+                    onApply={handleApply}
                 />
             </main>
         </div>

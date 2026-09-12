@@ -1,0 +1,31 @@
+services:
+  # Flask API — deployed as a Render Web Service (Starter plan keeps it always-on)
+  - type: web
+    name: avsar-api
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn --chdir backend flask_api:app --workers 2 --timeout 120
+    envVars:
+      - key: SUPABASE_URL
+        sync: false   # paste real value in Render dashboard
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false   # set to the Render static site URL below
+
+  # React frontend — Render Static Site (free tier)
+  - type: web
+    name: avsar-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false   # set to the avsar-api Render URL
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_KEY
+        sync: false

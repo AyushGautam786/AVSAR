@@ -28,7 +28,43 @@ export const useAuth = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
     })
-    if (error) console.error('Error signing in:', error)
+    if (error) {
+      console.error('Error signing in with Google:', error)
+      throw error
+    }
+  }
+
+  const signUpWithEmail = async (email: string, password: string, name?: string) => {
+    const trimmedEmail = email.trim()
+    const trimmedName = (name || trimmedEmail.split('@')[0]).trim()
+    const { data, error } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password,
+      options: {
+        data: {
+          name: trimmedName,
+          full_name: trimmedName,
+        },
+      },
+    })
+    if (error) {
+      console.error('Error signing up with email:', error)
+      throw error
+    }
+    return data
+  }
+
+  const signInWithEmail = async (email: string, password: string) => {
+    const trimmedEmail = email.trim()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password,
+    })
+    if (error) {
+      console.error('Error signing in with email:', error)
+      throw error
+    }
+    return data
   }
 
   const signOut = async () => {
@@ -40,6 +76,8 @@ export const useAuth = () => {
     user,
     loading,
     signInWithGoogle,
-    signOut
+    signUpWithEmail,
+    signInWithEmail,
+    signOut,
   }
 }

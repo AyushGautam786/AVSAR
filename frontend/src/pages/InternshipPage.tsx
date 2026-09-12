@@ -1,61 +1,116 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import InternshipsTab from '../components/InternshipsTab';
 import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../hooks/useApi';
+import type { Internship } from '../types';
 
 const InternshipsPage: React.FC = () => {
     const navigate = useNavigate();
     const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-    const { internships, fetchInternships } = useApi();
+    const {
+        internships,
+        internshipsMeta,
+        fetchInternships,
+        fetchAvailableOptions,
+        availableDomains,
+        saveApplication,
+        fetchMyApplications,
+        myApplications,
+        logEvent,
+    } = useApi();
 
-    // Redirect to landing page if not authenticated
+    const [isLoading, setIsLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [activeSearch, setActiveSearch] = useState('');
+    const [activeDomain, setActiveDomain] = useState('');
+    const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+    // Redirect if not authenticated
     useEffect(() => {
-        if (!authLoading && !user) {
-            navigate('/');
-        }
+        if (!authLoading && !user) navigate('/');
     }, [user, authLoading, navigate]);
 
-    // Fetch internships data when authenticated
+    // Build saved IDs set from applications
+    useEffect(() => {
+        if (myApplications.length > 0) {
+            setSavedIds(new Set(myApplications.map((a: any) => a.internship_id)));
+        }
+    }, [myApplications]);
+
+    // Load internships + options when authenticated
+    const loadData = useCallback(async (page = 1, q = '', domain = '') => {
+        setIsLoading(true);
+        await fetchInternships({ page, page_size: 15, q: q || undefined, domain: domain || undefined });
+        setIsLoading(false);
+    }, [fetchInternships]);
+
     useEffect(() => {
         if (user) {
-            fetchInternships();
+            loadData();
+            fetchAvailableOptions();
+            fetchMyApplications();
         }
-    }, [user, fetchInternships]);
+    }, [user, loadData, fetchAvailableOptions, fetchMyApplications]);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        loadData(page, activeSearch, activeDomain);
+    };
+
+    const handleSearch = (q: string) => {
+        setActiveSearch(q);
+        setCurrentPage(1);
+        loadData(1, q, activeDomain);
+    };
+
+    const handleFilterDomain = (domain: string) => {
+        setActiveDomain(domain);
+        setCurrentPage(1);
+        loadData(1, activeSearch, domain);
+    };
+
+    const handleSave = async (internship: Internship) => {
+        await saveApplication(internship.id, 'saved');
+        await logEvent(internship.id, 'save');
+        setSavedIds(prev => new Set(prev).add(internship.id));
+    };
 
     const handleSignOut = async () => {
         await signOut();
         navigate('/');
     };
 
-    // Show loading spinner while checking auth state
     if (authLoading) {
         return (
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-background)' }}>
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto" />
+                    <p className="mt-4 text-gray-500 text-sm">Loading...</p>
                 </div>
             </div>
         );
     }
 
-    // Don't render if not authenticated (will redirect)
-    if (!user) {
-        return null;
-    }
+    if (!user) return null;
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            <Header
-                user={user}
-                onSignOut={handleSignOut}
-                onSignIn={signInWithGoogle}
-            />
-
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-28">
-                <InternshipsTab internships={internships} />
+        <div className="page-container">
+            <Header user={user} onSignOut={handleSignOut} onSignIn={signInWithGoogle} />
+            <main className="page-main">
+                <InternshipsTab
+                    internships={internships}
+                    totalPages={internshipsMeta?.total_pages ?? 1}
+                    currentPage={currentPage}
+                    isLoading={isLoading}
+                    onPageChange={handlePageChange}
+                    onSearch={handleSearch}
+                    onFilterDomain={handleFilterDomain}
+                    onSave={handleSave}
+                    savedIds={savedIds}
+                    availableDomains={availableDomains}
+                />
             </main>
         </div>
     );

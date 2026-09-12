@@ -1,5 +1,18 @@
 flask
 flask-cors
+flask-limiter
 pandas
 numpy
 scikit-learn
+supabase
+PyJWT
+gunicorn
+python-dotenv
+requests
+# Phase 7 — semantic ML recommender
+sentence-transformers
+# Phase 8 — resume tailoring
+pdfplumber
+python-docx
+anthropic
+# openai  # uncomment if using OpenAI instead of Anthropic

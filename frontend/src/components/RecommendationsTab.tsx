@@ -1,18 +1,17 @@
 import React from 'react';
-import { Plus, Award, TrendingUp, MapPin, Calendar, ExternalLink } from 'lucide-react';
+import { Plus, TrendingUp, Sparkles, Brain, Zap } from 'lucide-react';
 import type { Student, Recommendation } from '../types';
 import RecommendationCard from '../components/RecommendationCard';
 import CustomFormModal from '../components/CustomFormModal';
 
 interface RecommendationsTabProps {
-  students: Student[];
+  students?: Student[];
   selectedStudent: Student | null;
   recommendations: Recommendation[];
   loading: boolean;
   currentStudent: Student | null;
-  onStudentSelect: (student: Student) => void;
+  onStudentSelect?: (student: Student) => void;
   onShowCustomForm: () => void;
-  // Add these props for the custom form modal
   customForm: any;
   setCustomForm: any;
   showCustomForm: boolean;
@@ -23,101 +22,13 @@ interface RecommendationsTabProps {
   onCustomFormSubmit: () => void;
   onCustomFormReset: () => void;
   customFormError: string | null;
+  onApply?: (internshipId: string, applyUrl?: string) => void;
 }
 
-// Hardcoded trending internships data
-const trendingInternships = [
-  {
-    id: 1,
-    title: "AI/ML Engineering Intern",
-    company: "TechCorp AI",
-    location: "San Francisco, CA",
-    domain: "Artificial Intelligence",
-    duration: "12 weeks",
-    description: "Work on cutting-edge machine learning models and AI applications",
-    tags: ["Python", "TensorFlow", "PyTorch", "Neural Networks"],
-    trending_score: 95
-  },
-  {
-    id: 2,
-    title: "Data Science Intern",
-    company: "DataInsights Inc",
-    location: "Remote",
-    domain: "Data Science",
-    duration: "10 weeks",
-    description: "Analyze large datasets and create predictive models for business insights",
-    tags: ["Python", "SQL", "Tableau", "Statistics"],
-    trending_score: 88
-  },
-  {
-    id: 3,
-    title: "Full-Stack Web Developer",
-    company: "WebSolutions Pro",
-    location: "Austin, TX",
-    domain: "Web Development",
-    duration: "16 weeks",
-    description: "Build modern web applications using latest technologies",
-    tags: ["React", "Node.js", "MongoDB", "TypeScript"],
-    trending_score: 82
-  },
-  {
-    id: 4,
-    title: "Cybersecurity Analyst Intern",
-    company: "SecureNet Systems",
-    location: "Washington, DC",
-    domain: "Cybersecurity",
-    duration: "14 weeks",
-    description: "Help protect digital infrastructure and analyze security threats",
-    tags: ["Network Security", "Penetration Testing", "SIEM", "Risk Assessment"],
-    trending_score: 79
-  }
-];
-
-const TrendingInternshipCard: React.FC<{ internship: typeof trendingInternships[0] }> = ({ internship }) => (
-  <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-    <div className="flex items-start justify-between mb-3">
-      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-        {internship.domain}
-      </span>
-    </div>
-    
-    <h3 className="text-lg font-semibold text-gray-900 mb-2">{internship.title}</h3>
-    <p className="text-gray-700 font-medium mb-2">{internship.company}</p>
-    
-    <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-      <div className="flex items-center space-x-1">
-        <MapPin className="h-4 w-4" />
-        <span>{internship.location}</span>
-      </div>
-      <div className="flex items-center space-x-1">
-        <Calendar className="h-4 w-4" />
-        <span>{internship.duration}</span>
-      </div>
-    </div>
-    
-    <p className="text-gray-600 text-sm mb-4">{internship.description}</p>
-    
-    <div className="flex flex-wrap gap-2 mb-4">
-      {internship.tags.map((tag, index) => (
-        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-          {tag}
-        </span>
-      ))}
-    </div>
-    
-    <button className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-      <span>View Details</span>
-      <ExternalLink className="h-4 w-4" />
-    </button>
-  </div>
-);
-
 const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
-  students,
   selectedStudent,
   recommendations,
   loading,
-  onStudentSelect,
   onShowCustomForm,
   customForm,
   setCustomForm,
@@ -128,70 +39,123 @@ const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
   availableSkills,
   onCustomFormSubmit,
   onCustomFormReset,
-  customFormError
+  customFormError,
+  onApply,
 }) => {
   return (
-    <div>
-      {/* Trending Internships Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">Trending Internships</h2>
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <TrendingUp className="h-4 w-4" />
-            <span>Most popular domains this month</span>
+    <div className="space-y-8">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shrink-0">
+            <Brain className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-white" style={{ fontFamily: 'var(--font-display)' }}>
+              AI Recommendations
+            </h1>
+            <p className="text-gray-500 text-sm mt-0.5">
+              {selectedStudent
+                ? `Showing matches for ${selectedStudent.name}`
+                : 'Create your profile to get personalized matches'}
+            </p>
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {trendingInternships.map((internship) => (
-            <TrendingInternshipCard key={internship.id} internship={internship} />
-          ))}
-        </div>
+
+        {/* ── CREATE PROFILE BUTTON — prominent & always visible ── */}
+        <button
+          onClick={onShowCustomForm}
+          className="btn-primary flex-shrink-0 text-sm px-5 py-2.5"
+          style={{ fontSize: '0.9rem' }}
+        >
+          <Plus className="h-4 w-4" />
+          {selectedStudent ? 'Update My Profile' : 'Create My Profile'}
+          <Sparkles className="h-4 w-4" />
+        </button>
       </div>
 
-      {/* Custom Profile Section */}
-      <div className="mb-8">
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Get Personalized Recommendations</h3>
-              <p className="text-gray-600">Create your custom profile to receive tailored internship recommendations based on your skills, interests, and preferences.</p>
+      {/* Create Profile Call-to-Action card (shown when no recommendations yet) */}
+      {!loading && recommendations.length === 0 && (
+        <div className="glass-card p-8 animate-fade-in-up">
+          {/* Glowing orb background */}
+          <div className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-indigo-600/10 blur-[80px]" />
+          </div>
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shrink-0 animate-pulse-glow">
+              <Zap className="h-8 w-8 text-white" />
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-xl font-black text-white mb-2">Get Personalized Internship Matches</h2>
+              <p className="text-gray-400 text-sm leading-relaxed max-w-xl">
+                Tell us your <span className="text-indigo-300 font-semibold">skills</span>,{' '}
+                <span className="text-violet-300 font-semibold">preferred domains</span>, and{' '}
+                <span className="text-cyan-300 font-semibold">locations</span> — our ML engine will rank
+                hundreds of live internships specifically for you.
+              </p>
             </div>
             <button
               onClick={onShowCustomForm}
-              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap ml-4"
+              className="btn-primary text-base px-6 py-3 shrink-0 animate-pulse-glow"
             >
-              <Plus className="h-4 w-4" />
-              <span>Create Profile</span>
+              <Plus className="h-5 w-5" />
+              Create My Profile
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Recommendations Section */}
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Getting personalized recommendations...</p>
-        </div>
-      ) : recommendations.length > 0 ? (
-        <div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">
-            Personalized Recommendations {selectedStudent ? `for ${selectedStudent.name}` : ''}
-          </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {recommendations.map((rec, index) => (
-              <RecommendationCard key={rec.internship_id} rec={rec} index={index} />
+          {/* Feature hints */}
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/8">
+            {[
+              { icon: Brain,    color: 'text-indigo-400', label: 'ML-Powered Ranking', desc: 'Random Forest + semantic embeddings' },
+              { icon: TrendingUp, color: 'text-violet-400', label: 'Live Internships',  desc: '890+ jobs updated regularly' },
+              { icon: Sparkles, color: 'text-cyan-400',    label: 'Feedback Loop',      desc: 'Gets smarter as you use it' },
+            ].map(({ icon: Icon, color, label, desc }, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Icon className={`h-5 w-5 ${color} shrink-0`} />
+                <div>
+                  <p className="text-sm font-semibold text-white">{label}</p>
+                  <p className="text-xs text-gray-500">{desc}</p>
+                </div>
+              </div>
             ))}
           </div>
         </div>
-      ) : (
-        <div className="text-center py-12">
-          <Award className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No personalized recommendations yet</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Create a custom profile to see personalized recommendations tailored to your preferences.
-          </p>
+      )}
+
+      {/* Loading state */}
+      {loading && (
+        <div className="glass-card p-16 text-center animate-fade-in">
+          <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
+            <Brain className="h-7 w-7 text-white" />
+          </div>
+          <p className="text-white font-semibold mb-1">Analyzing your profile…</p>
+          <p className="text-gray-500 text-sm">Our ML engine is ranking internships just for you</p>
+          <div className="flex justify-center gap-1 mt-6">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full gradient-primary animate-bounce"
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations Grid */}
+      {!loading && recommendations.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-xl font-bold text-white">
+              <span className="gradient-text">{recommendations.length}</span> matches found
+              {selectedStudent && <span className="text-gray-500 text-base font-normal ml-2">for {selectedStudent.name}</span>}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {recommendations.map((rec, index) => (
+              <RecommendationCard key={rec.internship_id} rec={rec} index={index} onApply={onApply} />
+            ))}
+          </div>
         </div>
       )}
 

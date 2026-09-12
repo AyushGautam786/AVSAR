@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Brain, CheckCircle } from 'lucide-react';
 import type { CustomFormData } from '../types';
+import DarkSelect from './DarkSelect';
 
 interface CustomFormModalProps {
   customForm: CustomFormData;
@@ -27,301 +28,234 @@ const CustomFormModal: React.FC<CustomFormModalProps> = ({
   loading,
   onSubmit,
   onReset,
-  error
+  error,
 }) => {
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [customLocationInput, setCustomLocationInput] = useState('');
   const [customSkillInput, setCustomSkillInput] = useState('');
 
-  const addToCustomForm = (field: keyof CustomFormData, value: string) => {
-    const currentArray = customForm[field] as string[];
-    if (!currentArray.includes(value) && value.trim()) {
-      setCustomForm(prev => ({
-        ...prev,
-        [field]: [...currentArray, value.trim()]
-      }));
+  const addToField = (field: keyof CustomFormData, value: string) => {
+    const arr = customForm[field] as string[];
+    if (value.trim() && !arr.includes(value.trim())) {
+      setCustomForm(prev => ({ ...prev, [field]: [...arr, value.trim()] }));
     }
   };
 
-  const removeFromCustomForm = (field: keyof CustomFormData, value: string) => {
-    const currentArray = customForm[field] as string[];
+  const removeFromField = (field: keyof CustomFormData, value: string) => {
     setCustomForm(prev => ({
       ...prev,
-      [field]: currentArray.filter(item => item !== value)
+      [field]: (prev[field] as string[]).filter(v => v !== value),
     }));
   };
 
-  const handleCustomInput = (field: keyof CustomFormData, inputValue: string, setInputValue: (value: string) => void) => {
-    if (inputValue.trim()) {
-      addToCustomForm(field, inputValue);
-      setInputValue('');
-    }
+  const handleKeyAdd = (
+    field: keyof CustomFormData,
+    inputVal: string,
+    setInput: (v: string) => void,
+    e: React.KeyboardEvent
+  ) => {
+    if (e.key === 'Enter') { e.preventDefault(); addToField(field, inputVal); setInput(''); }
   };
 
   if (!showCustomForm) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Create Custom Profile</h2>
-          <button
-            onClick={() => {
-              setShowCustomForm(false);
-              onReset();
-            }}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+  const colorMap = {
+    indigo: 'badge-indigo',
+    violet: 'badge-violet',
+    cyan:   'badge-cyan',
+  };
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+  const TagSection = ({
+    label, required, field, color, inputVal, setInput, options, placeholder,
+  }: {
+    label: string; required?: boolean; field: keyof CustomFormData;
+    color: 'indigo' | 'violet' | 'cyan'; inputVal: string;
+    setInput: (v: string) => void; options: string[]; placeholder: string;
+  }) => {
+    const tags = customForm[field] as string[];
+    const addBtnColor = {
+      indigo: 'bg-indigo-600 hover:bg-indigo-500',
+      violet: 'bg-violet-600 hover:bg-violet-500',
+      cyan:   'bg-cyan-600 hover:bg-cyan-500',
+    }[color];
+
+    const selectOptions = [
+      { value: '', label: 'Pick from list…' },
+      ...options.filter(o => !tags.includes(o)).map(o => ({ value: o, label: o })),
+    ];
+
+    return (
+      <div>
+        <label className="block text-sm font-semibold text-gray-300 mb-2">
+          {label} {required && <span className="text-red-400">*</span>}
+        </label>
+
+        {/* Tags */}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {tags.map((tag, i) => (
+              <span key={i} className={`badge ${colorMap[color]} flex items-center gap-1`}>
+                {tag}
+                <button type="button" onClick={() => removeFromField(field, tag)} className="ml-0.5 opacity-60 hover:opacity-100">
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            ))}
           </div>
         )}
 
-        <div className="space-y-6">
+        {/* Custom dark dropdown */}
+        {options.length > 0 && (
+          <DarkSelect
+            value=""
+            onChange={val => { if (val) addToField(field, val); }}
+            options={selectOptions}
+            placeholder="Pick from list…"
+            className="mb-2"
+          />
+        )}
+
+        {/* Free-text input */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={inputVal}
+            onChange={e => setInput(e.target.value)}
+            onKeyPress={e => handleKeyAdd(field, inputVal, setInput, e)}
+            className="input-dark flex-1"
+            placeholder={placeholder}
+          />
+          <button
+            type="button"
+            onClick={() => { addToField(field, inputVal); setInput(''); }}
+            className={`flex items-center justify-center px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors ${addBtnColor}`}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={() => { setShowCustomForm(false); onReset(); }}
+      />
+
+      <div className="relative glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in p-0">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-white/8 sticky top-0 z-10" style={{ background: '#0d1120' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
+              <Brain className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white">Create Your Profile</h2>
+              <p className="text-xs text-gray-500">Fill in your preferences to get AI recommendations</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setShowCustomForm(false); onReset(); }}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-6">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+            <label className="block text-sm font-semibold text-gray-300 mb-2">Your Name</label>
             <input
               type="text"
               value={customForm.name}
-              onChange={(e) => setCustomForm(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your name"
+              onChange={e => setCustomForm(prev => ({ ...prev, name: e.target.value }))}
+              className="input-dark"
+              placeholder="e.g. Ayush Gautam"
             />
           </div>
 
-          {/* Domains */}
+          <TagSection
+            label="Preferred Domains" required field="preferred_domains"
+            color="indigo" inputVal={customDomainInput} setInput={setCustomDomainInput}
+            options={availableDomains} placeholder="Type a domain & press Enter…"
+          />
+          <TagSection
+            label="Preferred Locations" required field="preferred_locations"
+            color="violet" inputVal={customLocationInput} setInput={setCustomLocationInput}
+            options={availableLocations} placeholder="City, state, or Remote…"
+          />
+          <TagSection
+            label="Your Skills" required field="skills"
+            color="cyan" inputVal={customSkillInput} setInput={setCustomSkillInput}
+            options={availableSkills} placeholder="e.g. Python, React, SQL…"
+          />
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Preferred Domains <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {customForm.preferred_domains.map((domain, index) => (
-                <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center space-x-1">
-                  <span>{domain}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFromCustomForm('preferred_domains', domain)}
-                    className="hover:bg-blue-200 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            {/* Dropdown for available domains */}
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  addToCustomForm('preferred_domains', e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-            >
-              <option value="">Select from available domains</option>
-              {(availableDomains || [])
-                .filter(domain => !customForm.preferred_domains.includes(domain))
-                .map(domain => (
-                  <option key={domain} value={domain}>{domain}</option>
-                ))}
-            </select>
-
-            {/* Custom domain input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={customDomainInput}
-                onChange={(e) => setCustomDomainInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCustomInput('preferred_domains', customDomainInput, setCustomDomainInput);
-                  }
-                }}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Or add custom domain"
-              />
-              <button
-                type="button"
-                onClick={() => handleCustomInput('preferred_domains', customDomainInput, setCustomDomainInput)}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Locations */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Preferred Locations <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {customForm.preferred_locations.map((location, index) => (
-                <span key={index} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm flex items-center space-x-1">
-                  <span>{location}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFromCustomForm('preferred_locations', location)}
-                    className="hover:bg-green-200 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            {/* Dropdown for available locations */}
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  addToCustomForm('preferred_locations', e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-            >
-              <option value="">Select from available locations</option>
-              {(availableLocations || [])
-                .filter(location => !customForm.preferred_locations.includes(location))
-                .map(location => (
-                  <option key={location} value={location}>{location}</option>
-                ))}
-              <option value="Remote" disabled={customForm.preferred_locations.includes('Remote')}>
-                Remote
-              </option>
-            </select>
-
-            {/* Custom location input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={customLocationInput}
-                onChange={(e) => setCustomLocationInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCustomInput('preferred_locations', customLocationInput, setCustomLocationInput);
-                  }
-                }}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Or add custom location"
-              />
-              <button
-                type="button"
-                onClick={() => handleCustomInput('preferred_locations', customLocationInput, setCustomLocationInput)}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Skills */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Skills <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {customForm.skills.map((skill, index) => (
-                <span key={index} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm flex items-center space-x-1">
-                  <span>{skill}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFromCustomForm('skills', skill)}
-                    className="hover:bg-purple-200 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            {/* Dropdown for available skills */}
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  addToCustomForm('skills', e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-            >
-              <option value="">Select from available skills</option>
-              {(availableSkills || [])
-                .filter(skill => !customForm.skills.includes(skill))
-                .map(skill => (
-                  <option key={skill} value={skill}>{skill}</option>
-                ))}
-            </select>
-
-            {/* Custom skill input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={customSkillInput}
-                onChange={(e) => setCustomSkillInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCustomInput('skills', customSkillInput, setCustomSkillInput);
-                  }
-                }}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Or add custom skill"
-              />
-              <button
-                type="button"
-                onClick={() => handleCustomInput('skills', customSkillInput, setCustomSkillInput)}
-                className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Interests */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Interests (comma-separated)</label>
+            <label className="block text-sm font-semibold text-gray-300 mb-2">Interests</label>
             <textarea
               value={customForm.interests.join(', ')}
-              onChange={(e) => setCustomForm(prev => ({
-                ...prev,
-                interests: e.target.value.split(',').map(i => i.trim()).filter(i => i)
-              }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={e =>
+                setCustomForm(prev => ({
+                  ...prev,
+                  interests: e.target.value.split(',').map(i => i.trim()).filter(Boolean),
+                }))
+              }
+              className="input-dark resize-none"
               rows={3}
-              placeholder="e.g., machine learning, web development, startups"
+              placeholder="e.g. machine learning, startups, open source…"
             />
+            <p className="text-xs text-gray-600 mt-1">Separate with commas</p>
           </div>
 
-          <div className="flex space-x-4">
-            <button
-              onClick={() => {
-                setShowCustomForm(false);
-                onReset();
-                setCustomDomainInput('');
-                setCustomLocationInput('');
-                setCustomSkillInput('');
-              }}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Getting Recommendations...' : 'Get Recommendations'}
-            </button>
-          </div>
+          {(customForm.preferred_domains.length > 0 || customForm.skills.length > 0) && (
+            <div className="p-4 rounded-xl bg-indigo-500/8 border border-indigo-500/20">
+              <p className="text-xs font-semibold text-indigo-300 mb-2 flex items-center gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5" /> Profile summary
+              </p>
+              <div className="text-xs text-gray-400 space-y-0.5">
+                {customForm.preferred_domains.length > 0 && <p>✦ {customForm.preferred_domains.length} domain(s) selected</p>}
+                {customForm.preferred_locations.length > 0 && <p>✦ {customForm.preferred_locations.length} location(s) selected</p>}
+                {customForm.skills.length > 0 && <p>✦ {customForm.skills.length} skill(s) added</p>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 p-6 pt-0">
+          <button
+            onClick={() => { setShowCustomForm(false); onReset(); setCustomDomainInput(''); setCustomLocationInput(''); setCustomSkillInput(''); }}
+            className="btn-secondary flex-1"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={loading}
+            className="btn-primary flex-1 justify-center disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                Getting matches…
+              </>
+            ) : (
+              <>
+                <Brain className="h-4 w-4" />
+                Get My Recommendations
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

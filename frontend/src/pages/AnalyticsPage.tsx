@@ -32,10 +32,10 @@ const AnalyticsPage: React.FC = () => {
     // Show loading spinner while checking auth state
     if (authLoading) {
         return (
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-background)' }}>
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+                    <p className="mt-4 text-gray-500 text-sm">Loading...</p>
                 </div>
             </div>
         );
@@ -47,14 +47,14 @@ const AnalyticsPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100">
+        <div className="page-container">
             <Header
                 user={user}
                 onSignOut={handleSignOut}
                 onSignIn={signInWithGoogle}
             />
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-28">
+            <main className="page-main">
                 {stats && <AnalyticsTab stats={stats} />}
             </main>
         </div>

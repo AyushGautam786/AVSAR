@@ -8,84 +8,76 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-// Define the base API URL - adjust this to match your Flask server
-const API_BASE_URL = 'http://localhost:5000';
+interface PaginatedInternships {
+  data: Internship[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+// Reads from env var — set VITE_API_URL=http://localhost:5000 in .env for local dev
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+/** Returns the Bearer token for the current Supabase session, or null. */
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export const useApi = () => {
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students] = useState<Student[]>([]);
   const [internships, setInternships] = useState<Internship[]>([]);
+  const [internshipsMeta, setInternshipsMeta] = useState<Omit<PaginatedInternships, 'data'> | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
-  
+  const [myApplications, setMyApplications] = useState<any[]>([]);
+
   // Available options for dropdowns
   const [availableDomains, setAvailableDomains] = useState<string[]>([]);
   const [availableLocations, setAvailableLocations] = useState<string[]>([]);
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
 
-  const fetchStudents = useCallback(async (): Promise<ApiResponse<Student[]>> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/students`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // The API returns an array directly, not wrapped in an object
-      if (Array.isArray(data)) {
-        setStudents(data);
-        return { data };
-      } else {
-        return { error: 'Invalid response format' };
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch students';
-      return { error: errorMessage };
-    }
-  }, []);
+  // ── Student profile (Supabase direct) ────────────────────────────────────
 
   const fetchStudentProfile = useCallback(async (user: User): Promise<ApiResponse<Student>> => {
     try {
       const { data, error } = await supabase
-        .from('students') // Updated table name to match schema
+        .from('students')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-        throw error;
-      }
+      if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
         setCurrentStudent(data);
         return { data };
-      } else {
-        // No profile found, create a basic one
-        const newProfile = {
-          user_id: user.id,
-          name: user.user_metadata?.full_name || user.email || 'Student',
-          email: user.email || '',
-          preferred_domains: [],
-          preferred_locations: [],
-          skills: [],
-          interests: []
-        };
-
-        const { data: createdProfile, error: createError } = await supabase
-          .from('students')
-          .insert(newProfile)
-          .select()
-          .single();
-
-        if (createError) throw createError;
-
-        setCurrentStudent(createdProfile);
-        return { data: createdProfile };
       }
+
+      // Create a blank profile if none exists
+      const newProfile = {
+        user_id: user.id,
+        name: user.user_metadata?.full_name || user.email || 'Student',
+        email: user.email || '',
+        preferred_domains: [],
+        preferred_locations: [],
+        skills: [],
+        interests: [],
+      };
+
+      const { data: createdProfile, error: createError } = await supabase
+        .from('students')
+        .insert(newProfile)
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      setCurrentStudent(createdProfile);
+      return { data: createdProfile };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch student profile';
-      return { error: errorMessage };
+      return { error: error instanceof Error ? error.message : 'Failed to fetch student profile' };
     }
   }, []);
 
@@ -98,107 +90,85 @@ export const useApi = () => {
         .single();
 
       if (error) throw error;
-
       setCurrentStudent(data);
       return { data };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update student profile';
-      return { error: errorMessage };
+      return { error: error instanceof Error ? error.message : 'Failed to update student profile' };
     }
   }, []);
 
-  const fetchInternships = useCallback(async (): Promise<ApiResponse<Internship[]>> => {
+  // ── Internships (Flask API, paginated) ───────────────────────────────────
+
+  const fetchInternships = useCallback(async (
+    filters: { domain?: string; location?: string; remote?: boolean; q?: string; page?: number; page_size?: number } = {}
+  ): Promise<ApiResponse<PaginatedInternships>> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/internships`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // The API returns an array directly
-      if (Array.isArray(data)) {
-        setInternships(data);
-        return { data };
-      } else {
-        return { error: 'Invalid response format' };
-      }
+      const params = new URLSearchParams();
+      if (filters.domain)    params.set('domain', filters.domain);
+      if (filters.location)  params.set('location', filters.location);
+      if (filters.remote !== undefined) params.set('remote', String(filters.remote));
+      if (filters.q)         params.set('q', filters.q);
+      if (filters.page)      params.set('page', String(filters.page));
+      if (filters.page_size) params.set('page_size', String(filters.page_size));
+
+      const response = await fetch(`${API_BASE_URL}/api/internships?${params}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const json: PaginatedInternships = await response.json();
+      setInternships(json.data ?? []);
+      setInternshipsMeta({ total: json.total, page: json.page, page_size: json.page_size, total_pages: json.total_pages });
+      return { data: json };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch internships';
-      return { error: errorMessage };
+      return { error: error instanceof Error ? error.message : 'Failed to fetch internships' };
     }
   }, []);
+
+  // ── Stats ────────────────────────────────────────────────────────────────
 
   const fetchStats = useCallback(async (): Promise<ApiResponse<Stats>> => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/stats`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      
-      if (data.error) {
-        return { error: data.error };
-      }
-      
+      if (data.error) return { error: data.error };
       setStats(data);
       return { data };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch stats';
-      return { error: errorMessage };
+      return { error: error instanceof Error ? error.message : 'Failed to fetch stats' };
     }
   }, []);
+
+  // ── Available options ────────────────────────────────────────────────────
 
   const fetchAvailableOptions = useCallback(async (): Promise<ApiResponse<any>> => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/available-options`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      
-      if (data.error) {
-        return { error: data.error };
-      }
-      
-      setAvailableDomains(data.domains || []);
-      setAvailableLocations(data.locations || []);
-      setAvailableSkills(data.skills || []);
+      if (data.error) return { error: data.error };
+      setAvailableDomains(data.domains ?? []);
+      setAvailableLocations(data.locations ?? []);
+      setAvailableSkills(data.skills ?? []);
       return { data };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch available options';
-      return { error: errorMessage };
+      return { error: error instanceof Error ? error.message : 'Failed to fetch available options' };
     }
   }, []);
 
-  const fetchRecommendations = useCallback(async (studentId: number): Promise<ApiResponse<Recommendation[]>> => {
+  // ── Recommendations (auth-protected) ────────────────────────────────────
+
+  const fetchRecommendations = useCallback(async (studentId: string): Promise<ApiResponse<Recommendation[]>> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/recommendations/${studentId}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      const authHeaders = await getAuthHeader();
+      const response = await fetch(`${API_BASE_URL}/api/recommendations/${studentId}`, {
+        headers: authHeaders,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      
-      if (data.error) {
-        return { error: data.error };
-      }
-      
-      // The API returns an array of recommendations directly
-      if (Array.isArray(data)) {
-        return { data };
-      } else {
-        return { error: 'Invalid response format' };
-      }
+      if (data.error) return { error: data.error };
+      return Array.isArray(data) ? { data } : { error: 'Invalid response format' };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch recommendations';
-      return { error: errorMessage };
+      return { error: error instanceof Error ? error.message : 'Failed to fetch recommendations' };
     }
   }, []);
 
@@ -206,39 +176,88 @@ export const useApi = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/recommendations/custom`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      
-      if (data.error) {
-        return { error: data.error };
-      }
-      
-      // The API returns an array of recommendations directly
-      if (Array.isArray(data)) {
-        return { data };
-      } else {
-        return { error: 'Invalid response format' };
-      }
+      if (data.error) return { error: data.error };
+      return Array.isArray(data) ? { data } : { error: 'Invalid response format' };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch custom recommendations';
-      return { error: errorMessage };
+      return { error: error instanceof Error ? error.message : 'Failed to fetch custom recommendations' };
     }
   }, []);
+
+  // ── Applications (auth-protected) ────────────────────────────────────────
+
+  const saveApplication = useCallback(async (
+    internshipId: string,
+    status: 'saved' | 'applied' | 'interviewing' | 'rejected' | 'offered' = 'saved'
+  ): Promise<ApiResponse<any>> => {
+    try {
+      const authHeaders = await getAuthHeader();
+      const response = await fetch(`${API_BASE_URL}/api/applications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ internship_id: internshipId, status }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      return { data };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Failed to save application' };
+    }
+  }, []);
+
+  const fetchMyApplications = useCallback(async (): Promise<ApiResponse<any[]>> => {
+    try {
+      const authHeaders = await getAuthHeader();
+      const response = await fetch(`${API_BASE_URL}/api/applications/me`, {
+        headers: authHeaders,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      setMyApplications(data);
+      return { data };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Failed to fetch applications' };
+    }
+  }, []);
+
+  // ── Interaction events ────────────────────────────────────────────────────
+
+  const logEvent = useCallback(async (
+    internshipId: string,
+    eventType: 'view' | 'click' | 'save' | 'apply' | 'dismiss'
+  ): Promise<void> => {
+    try {
+      const authHeaders = await getAuthHeader();
+      if (!authHeaders.Authorization) return; // not logged in, skip silently
+      await fetch(`${API_BASE_URL}/api/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ internship_id: internshipId, event_type: eventType }),
+      });
+    } catch {
+      // Silently ignore — event logging should never crash the UI
+    }
+  }, []);
+
+  // ── Legacy compat (numeric student IDs for old pages) ────────────────────
+
+  const fetchStudents = useCallback(async () => {
+    // Students are now sourced from Supabase directly via fetchStudentProfile.
+    // This stub is kept for backward compatibility.
+    return { data: students };
+  }, [students]);
 
   return {
     students,
     internships,
+    internshipsMeta,
     stats,
     currentStudent,
+    myApplications,
     availableDomains,
     availableLocations,
     availableSkills,
@@ -250,5 +269,8 @@ export const useApi = () => {
     fetchAvailableOptions,
     fetchRecommendations,
     fetchCustomRecommendations,
+    saveApplication,
+    fetchMyApplications,
+    logEvent,
   };
 };

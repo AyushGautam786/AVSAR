@@ -1,64 +1,66 @@
 import React from 'react';
-import { Users, Building2, Briefcase, TrendingUp } from 'lucide-react';
+import { Users, Building2, Briefcase, Cpu, MapPin, IndianRupee, BarChart3 } from 'lucide-react';
 import type { Stats } from '../types';
-import StatCard from '../components/Stat_Card';
 
 interface AnalyticsTabProps {
   stats: Stats;
 }
 
 const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ stats }) => {
+  const maxDomain = Math.max(...Object.values(stats.domain_distribution), 1);
+  const maxLocation = Math.max(...Object.values(stats.location_distribution), 1);
+
   return (
-    <div>
-      <h2 className="text-3xl font-bold text-gray-900 mb-8">System Analytics</h2>
-      
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <StatCard 
-          title="Total Students" 
-          value={stats.total_students} 
-          icon={Users} 
-          color="blue" 
-        />
-        <StatCard 
-          title="Total Internships" 
-          value={stats.total_internships} 
-          icon={Building2} 
-          color="green" 
-        />
-        <StatCard 
-          title="Domains Available" 
-          value={Object.keys(stats.domain_distribution).length} 
-          icon={Briefcase} 
-          color="purple" 
-        />
-        <StatCard 
-          title="ML Model Status" 
-          value={stats.model_trained ? "Active" : "Inactive"} 
-          icon={TrendingUp} 
-          color={stats.model_trained ? "green" : "red"} 
-        />
+    <div className="space-y-8">
+      {/* Page header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+          <BarChart3 className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-black text-white" style={{ fontFamily: 'var(--font-display)' }}>Platform Analytics</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Real-time stats from the AVSAR database</p>
+        </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Students',   value: stats.total_students,                               icon: Users,     color: 'text-indigo-400',  bg: 'bg-indigo-500/10 border-indigo-500/20' },
+          { label: 'Live Internships', value: stats.total_internships,                             icon: Building2, color: 'text-violet-400',  bg: 'bg-violet-500/10 border-violet-500/20' },
+          { label: 'Domains Available',value: Object.keys(stats.domain_distribution).length,       icon: Briefcase, color: 'text-cyan-400',    bg: 'bg-cyan-500/10 border-cyan-500/20' },
+          { label: 'ML Model',         value: stats.model_trained ? 'Active ✓' : 'Training',       icon: Cpu,       color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+        ].map(({ label, value, icon: Icon, color, bg }, i) => (
+          <div key={i} className={`glass-card p-5 animate-fade-in-up delay-${i * 100}`}>
+            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center mb-4 ${bg}`}>
+              <Icon className={`h-5 w-5 ${color}`} />
+            </div>
+            <p className="text-2xl font-black text-white">{value}</p>
+            <p className="text-xs text-gray-500 mt-1">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts grid */}
+      <div className="grid lg:grid-cols-2 gap-6">
         {/* Domain Distribution */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Domain Distribution</h3>
+        <div className="glass-card p-6 animate-fade-in-up delay-300">
+          <div className="flex items-center gap-2 mb-5">
+            <Briefcase className="h-4 w-4 text-indigo-400" />
+            <h3 className="text-base font-bold text-white">Domain Distribution</h3>
+          </div>
           <div className="space-y-3">
-            {Object.entries(stats.domain_distribution).map(([domain, count]) => (
-              <div key={domain} className="flex items-center justify-between">
-                <span className="text-gray-700">{domain}</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-24 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full"
-                      style={{
-                        width: `${(count / Math.max(...Object.values(stats.domain_distribution))) * 100}%`
-                      }}
-                    ></div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">{count}</span>
+            {Object.entries(stats.domain_distribution).slice(0, 10).map(([domain, count]) => (
+              <div key={domain}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-400 truncate max-w-[60%]">{domain}</span>
+                  <span className="text-xs font-semibold text-white">{count}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700"
+                    style={{ width: `${(count / maxDomain) * 100}%` }}
+                  />
                 </div>
               </div>
             ))}
@@ -66,40 +68,44 @@ const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ stats }) => {
         </div>
 
         {/* Location Distribution */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Distribution</h3>
+        <div className="glass-card p-6 animate-fade-in-up delay-400">
+          <div className="flex items-center gap-2 mb-5">
+            <MapPin className="h-4 w-4 text-cyan-400" />
+            <h3 className="text-base font-bold text-white">Location Distribution</h3>
+          </div>
           <div className="space-y-3">
-            {Object.entries(stats.location_distribution).map(([location, count]) => (
-              <div key={location} className="flex items-center justify-between">
-                <span className="text-gray-700">{location}</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-24 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full"
-                      style={{
-                        width: `${(count / Math.max(...Object.values(stats.location_distribution))) * 100}%`
-                      }}
-                    ></div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">{count}</span>
+            {Object.entries(stats.location_distribution).slice(0, 10).map(([location, count]) => (
+              <div key={location}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-400 truncate max-w-[60%]">{location}</span>
+                  <span className="text-xs font-semibold text-white">{count}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-700"
+                    style={{ width: `${(count / maxLocation) * 100}%` }}
+                  />
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Average Stipend by Domain */}
-        <div className="bg-white rounded-lg shadow-md p-6 lg:col-span-2">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Average Stipend by Domain</h3>
-          <div className="space-y-4">
-            {Object.entries(stats.avg_stipend_by_domain).map(([domain, avgStipend]) => (
-              <div key={domain} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <span className="font-medium text-gray-900">{domain}</span>
+        {/* Average Stipend */}
+        <div className="glass-card p-6 lg:col-span-2 animate-fade-in-up delay-500">
+          <div className="flex items-center gap-2 mb-5">
+            <IndianRupee className="h-4 w-4 text-amber-400" />
+            <h3 className="text-base font-bold text-white">Average Stipend by Domain</h3>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {Object.entries(stats.avg_stipend_by_domain).map(([domain, avg]) => (
+              <div key={domain} className="flex items-center justify-between p-3 rounded-xl bg-white/3 border border-white/8">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-500" />
+                  <span className="text-sm text-gray-300 truncate max-w-[140px]">{domain}</span>
                 </div>
-                <span className="text-lg font-bold text-green-600">
-                  ₹{Math.round(avgStipend).toLocaleString()}
+                <span className="text-sm font-bold text-emerald-400">
+                  ₹{Math.round(avg).toLocaleString()}
                 </span>
               </div>
             ))}

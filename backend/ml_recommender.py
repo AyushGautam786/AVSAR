@@ -1,459 +1,508 @@
-import pandas as pd
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+"""
+AVSAR — ML Internship Recommender (Phase 7 Upgrade)
+=====================================================
+Upgrades:
+  1. Semantic embeddings (sentence-transformers all-MiniLM-L6-v2) blended with
+     existing TF-IDF features, so synonym matches ("ML" ↔ "Machine Learning") score higher.
+  2. Real interaction_events training target (view=0.2, click=0.5, save=0.7, apply=1.0,
+     dismiss=-0.5) with the existing synthetic generator as cold-start fallback.
+  3. explain_match() now returns matched_skills / missing_skills on every recommendation.
+  4. save_model() / load_model() use pickle — wire a nightly retrain job to replace the
+     artifact, and load_model() at boot so the Flask process never trains from scratch.
+"""
+
+import logging
 import pickle
 import warnings
-warnings.filterwarnings('ignore')
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+
+warnings.filterwarnings("ignore")
+log = logging.getLogger(__name__)
+
+# ── Lazy-load sentence-transformers so import doesn't crash if not installed ──
+
+_embedder = None
+_EMBED_AVAILABLE = False
+
+
+def _get_embedder():
+    global _embedder, _EMBED_AVAILABLE
+    if _embedder is not None:
+        return _embedder
+    try:
+        from sentence_transformers import SentenceTransformer
+        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+        _EMBED_AVAILABLE = True
+        log.info("Sentence-transformers loaded (all-MiniLM-L6-v2).")
+    except Exception as exc:
+        log.warning("sentence-transformers unavailable — using TF-IDF only. (%s)", exc)
+        _EMBED_AVAILABLE = False
+    return _embedder
+
+
+def _semantic_sim(text_a: str, text_b: str) -> float:
+    """Cosine similarity between two texts using sentence embeddings (normalized → dot product)."""
+    embedder = _get_embedder()
+    if not _EMBED_AVAILABLE or not embedder or not text_a or not text_b:
+        return 0.0
+    try:
+        vecs = embedder.encode([text_a, text_b], normalize_embeddings=True)
+        return float(np.dot(vecs[0], vecs[1]))
+    except Exception:
+        return 0.0
+
+
+def _tfidf_sim(text_a: str, text_b: str) -> float:
+    """Fallback TF-IDF cosine similarity."""
+    if not text_a or not text_b:
+        return 0.0
+    try:
+        vz = TfidfVectorizer(stop_words="english")
+        mat = vz.fit_transform([text_a, text_b])
+        return float(cosine_similarity(mat[0:1], mat[1:2])[0][0])
+    except Exception:
+        return 0.0
+
+
+# ── Event weight map — used for real training targets ────────────────────────
+
+EVENT_WEIGHTS: dict[str, float] = {
+    "view": 0.2,
+    "click": 0.5,
+    "save": 0.7,
+    "apply": 1.0,
+    "dismiss": -0.5,
+}
+
+
+# ── Recommender ───────────────────────────────────────────────────────────────
 
 class MLInternshipRecommender:
+
     def __init__(self):
-        self.tfidf_skills = TfidfVectorizer(stop_words='english', max_features=500)
-        self.tfidf_interests = TfidfVectorizer(stop_words='english', max_features=300)
+        self.tfidf_skills = TfidfVectorizer(stop_words="english", max_features=500)
+        self.tfidf_interests = TfidfVectorizer(stop_words="english", max_features=300)
         self.domain_encoder = LabelEncoder()
         self.location_encoder = LabelEncoder()
         self.scaler = StandardScaler()
-        self.ml_model = RandomForestRegressor(n_estimators=100, random_state=42)
+        self.ml_model = RandomForestRegressor(n_estimators=150, random_state=42, n_jobs=-1)
         self.is_trained = False
-        
-    def preprocess_data(self, students_df, internships_df, interactions_df=None):
-        """
-        Preprocess data for ML model training
-        
-        Parameters:
-        - students_df: DataFrame with student profiles
-        - internships_df: DataFrame with internship details
-        - interactions_df: DataFrame with student-internship interactions (optional)
-        """
-        print("Preprocessing data...")
-        
-        # Create student-internship pairs
-        pairs = []
-        
-        if interactions_df is not None:
-            # Use actual interaction data if available
-            for _, interaction in interactions_df.iterrows():
-                student_id = interaction['student_id']
-                internship_id = interaction['internship_id']
-                rating = interaction['rating']  # 1-5 scale or binary (applied/not applied)
-                
-                student = students_df[students_df['id'] == student_id].iloc[0]
-                internship = internships_df[internships_df['id'] == internship_id].iloc[0]
-                
-                pair = self.create_feature_vector(student, internship)
-                pair['target'] = rating
-                pairs.append(pair)
-        else:
-            # Generate synthetic training data based on compatibility rules
-            print("Generating synthetic training data...")
-            for _, student in students_df.iterrows():
-                for _, internship in internships_df.iterrows():
-                    pair = self.create_feature_vector(student, internship)
-                    # Generate synthetic target based on compatibility
-                    pair['target'] = self.generate_synthetic_target(student, internship)
-                    pairs.append(pair)
-        
-        return pd.DataFrame(pairs)
-    
-    def create_feature_vector(self, student, internship):
-        """Create feature vector for student-internship pair"""
-        features = {}
-        
-        # Domain matching features
-        student_domains = student.get('preferred_domains', [])
-        if isinstance(student_domains, str):
-            student_domains = student_domains.split(',')
-        
-        internship_domain = internship.get('domain', '')
-        features['domain_exact_match'] = 1 if internship_domain in student_domains else 0
-        features['domain_similarity'] = self.calculate_domain_similarity(student_domains, internship_domain)
-        
-        # Location matching features
-        student_locations = student.get('preferred_locations', [])
-        if isinstance(student_locations, str):
-            student_locations = student_locations.split(',')
-        
-        internship_location = internship.get('location', '')
-        features['location_exact_match'] = 1 if internship_location in student_locations else 0
-        features['is_remote'] = 1 if internship.get('is_remote', False) else 0
-        features['location_flexibility'] = len(student_locations)
-        
-        # Skills matching features
-        student_skills = student.get('skills', [])
-        if isinstance(student_skills, str):
-            student_skills = student_skills.split(',')
-        
-        required_skills = internship.get('required_skills', [])
-        if isinstance(required_skills, str):
-            required_skills = required_skills.split(',')
-        
-        features['skills_overlap'] = len(set(student_skills) & set(required_skills))
-        features['skills_coverage'] = features['skills_overlap'] / max(len(required_skills), 1)
-        features['student_skill_count'] = len(student_skills)
-        features['required_skill_count'] = len(required_skills)
-        
-        # Interest matching features
-        student_interests = student.get('interests', [])
-        if isinstance(student_interests, str):
-            student_interests = student_interests.split(',')
-        
-        job_description = internship.get('description', '')
-        features['interest_job_similarity'] = self.calculate_text_similarity(
-            ' '.join(student_interests), job_description
-        )
-        
-        # Company and role features
-        features['company_size'] = internship.get('company_size', 0)  # Small=1, Medium=2, Large=3
-        features['stipend'] = internship.get('stipend', 0)
-        features['duration_weeks'] = internship.get('duration_weeks', 12)
-        
-        # Encoded categorical features
-        features['domain_encoded'] = internship_domain
-        features['location_encoded'] = internship_location
-        
+        self.feature_cols: list[str] = []
+
+    # ── Feature engineering ───────────────────────────────────────────────────
+
+    def _coerce_list(self, val) -> list[str]:
+        if isinstance(val, list):
+            return [str(v).strip() for v in val if v]
+        if isinstance(val, str):
+            return [v.strip() for v in val.split(",") if v.strip()]
+        return []
+
+    def create_feature_vector(self, student: dict, internship: dict) -> dict:
+        features: dict[str, Any] = {}
+
+        # ── Domain ───────────────────────────────────────────────────────────
+        student_domains = self._coerce_list(student.get("preferred_domains", []))
+        intern_domain = str(internship.get("domain") or "")
+        features["domain_exact_match"] = int(intern_domain in student_domains)
+        features["domain_similarity"] = self._domain_similarity(student_domains, intern_domain)
+
+        # ── Location ─────────────────────────────────────────────────────────
+        student_locs = self._coerce_list(student.get("preferred_locations", []))
+        intern_loc = str(internship.get("location") or "")
+        features["location_exact_match"] = int(intern_loc in student_locs)
+        features["is_remote"] = int(bool(internship.get("is_remote", False)))
+        features["location_flexibility"] = len(student_locs)
+
+        # ── Skills (keyword overlap) ──────────────────────────────────────────
+        student_skills_raw = self._coerce_list(student.get("skills", []))
+        required_skills_raw = self._coerce_list(internship.get("required_skills", []))
+        student_skills = {s.lower() for s in student_skills_raw}
+        required_skills = {s.lower() for s in required_skills_raw}
+        overlap = student_skills & required_skills
+        features["skills_overlap"] = len(overlap)
+        features["skills_coverage"] = len(overlap) / max(len(required_skills), 1)
+        features["student_skill_count"] = len(student_skills)
+        features["required_skill_count"] = len(required_skills)
+
+        # ── Skills semantic similarity ─────────────────────────────────────
+        student_skills_text = " ".join(student_skills_raw)
+        intern_skills_text = " ".join(required_skills_raw)
+        sem_skill = _semantic_sim(student_skills_text, intern_skills_text)
+        tfidf_skill = _tfidf_sim(student_skills_text, intern_skills_text)
+        # Blend: 60 % semantic + 40 % TF-IDF (TF-IDF stronger on exact keyword names)
+        features["skill_semantic_similarity"] = 0.6 * sem_skill + 0.4 * tfidf_skill
+
+        # ── Interest / JD similarity ─────────────────────────────────────────
+        interests_text = " ".join(self._coerce_list(student.get("interests", [])))
+        jd_text = str(internship.get("description") or "")
+        sem_interest = _semantic_sim(interests_text, jd_text)
+        tfidf_interest = _tfidf_sim(interests_text, jd_text)
+        features["interest_job_similarity"] = 0.5 * sem_interest + 0.5 * tfidf_interest
+
+        # ── Numeric role features ─────────────────────────────────────────────
+        features["stipend"] = float(internship.get("stipend") or 0)
+        features["duration_weeks"] = float(internship.get("duration_weeks") or 12)
+
+        # ── Categorical (encoded later) ───────────────────────────────────────
+        features["domain_encoded"] = intern_domain
+        features["location_encoded"] = intern_loc
+
         return features
-    
-    def calculate_domain_similarity(self, student_domains, internship_domain):
-        """Calculate semantic similarity between domains"""
-        domain_mapping = {
-            'web dev': ['frontend', 'backend', 'fullstack', 'web development'],
-            'ai/ml': ['artificial intelligence', 'machine learning', 'data science', 'deep learning'],
-            'mobile dev': ['android', 'ios', 'react native', 'flutter'],
-            'marketing': ['digital marketing', 'content marketing', 'social media marketing'],
-            'data science': ['data analysis', 'analytics', 'business intelligence', 'ai/ml'],
-            'cybersecurity': ['security', 'penetration testing', 'network security'],
-            'cloud': ['aws', 'azure', 'gcp', 'devops'],
-            'product management': ['pm', 'product', 'strategy']
-        }
-        
-        max_similarity = 0
-        for student_domain in student_domains:
-            student_domain_lower = student_domain.lower().strip()
-            internship_domain_lower = internship_domain.lower().strip()
-            
-            # Exact match
-            if student_domain_lower == internship_domain_lower:
+
+    # ── Domain similarity ──────────────────────────────────────────────────────
+
+    _DOMAIN_GROUPS: dict[str, list[str]] = {
+        "web dev": ["frontend", "backend", "fullstack", "web development", "web dev"],
+        "ai/ml": ["artificial intelligence", "machine learning", "data science", "deep learning", "nlp", "ai", "ml"],
+        "mobile dev": ["android", "ios", "react native", "flutter", "mobile"],
+        "marketing": ["digital marketing", "content marketing", "social media marketing", "growth"],
+        "data science": ["data analysis", "analytics", "business intelligence", "data engineering"],
+        "cybersecurity": ["security", "penetration testing", "network security", "infosec"],
+        "cloud": ["aws", "azure", "gcp", "devops", "platform engineering"],
+        "product management": ["pm", "product", "product strategy"],
+        "design": ["ux", "ui/ux", "product design", "graphic design"],
+        "finance": ["accounting", "investment", "fintech", "financial analysis"],
+    }
+
+    def _domain_similarity(self, student_domains: list[str], intern_domain: str) -> float:
+        intern_lower = intern_domain.lower().strip()
+        for sd in student_domains:
+            sd_lower = sd.lower().strip()
+            if sd_lower == intern_lower:
                 return 1.0
-            
-            # Check semantic similarity
-            for key, synonyms in domain_mapping.items():
-                if student_domain_lower in synonyms or student_domain_lower == key:
-                    if internship_domain_lower in synonyms or internship_domain_lower == key:
-                        max_similarity = max(max_similarity, 0.8)
-                        break
-        
-        return max_similarity
-    
-    def calculate_text_similarity(self, text1, text2):
-        """Calculate cosine similarity between two texts"""
-        if not text1 or not text2:
-            return 0.0
-        
-        try:
-            vectorizer = TfidfVectorizer(stop_words='english')
-            tfidf_matrix = vectorizer.fit_transform([text1, text2])
-            similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-            return similarity
-        except:
-            return 0.0
-    
-    def generate_synthetic_target(self, student, internship):
-        """Generate synthetic target score based on compatibility rules"""
-        score = 0
-        
-        # Domain matching (0-3 points)
-        student_domains = student.get('preferred_domains', [])
-        if isinstance(student_domains, str):
-            student_domains = student_domains.split(',')
-        
-        internship_domain = internship.get('domain', '')
-        domain_similarity = self.calculate_domain_similarity(student_domains, internship_domain)
-        score += domain_similarity * 3
-        
-        # Location matching (0-2 points)
-        student_locations = student.get('preferred_locations', [])
-        if isinstance(student_locations, str):
-            student_locations = student_locations.split(',')
-        
-        internship_location = internship.get('location', '')
-        if internship_location in student_locations or internship.get('is_remote', False):
-            score += 2
-        elif any(loc.split(',')[0] == internship_location.split(',')[0] for loc in student_locations):
-            score += 1
-        
-        # Skills matching (0-2 points)
-        student_skills = student.get('skills', [])
-        if isinstance(student_skills, str):
-            student_skills = student_skills.split(',')
-        
-        required_skills = internship.get('required_skills', [])
-        if isinstance(required_skills, str):
-            required_skills = required_skills.split(',')
-        
-        if required_skills:
-            skills_overlap = len(set(student_skills) & set(required_skills))
-            skills_coverage = skills_overlap / len(required_skills)
-            score += skills_coverage * 2
-        
-        # Interest matching (0-1 points)
-        student_interests = student.get('interests', [])
-        if isinstance(student_interests, str):
-            student_interests = student_interests.split(',')
-        
-        job_description = internship.get('description', '')
-        interest_similarity = self.calculate_text_similarity(
-            ' '.join(student_interests), job_description
-        )
-        score += interest_similarity
-        
-        # Add some noise to make it more realistic
-        noise = np.random.normal(0, 0.3)
-        score = max(0, min(5, score + noise))  # Keep between 0-5
-        
-        return score
-    
-    def prepare_features(self, data_df):
-        """Prepare features for ML model"""
-        features_df = data_df.copy()
-        
-        # Encode categorical variables
-        categorical_cols = ['domain_encoded', 'location_encoded']
-        for col in categorical_cols:
-            if col in features_df.columns:
-                # Handle unseen categories
-                unique_vals = features_df[col].unique()
-                if col == 'domain_encoded':
-                    if not hasattr(self, 'domain_classes_'):
-                        self.domain_encoder.fit(unique_vals)
-                        self.domain_classes_ = self.domain_encoder.classes_
-                    
-                    # Handle unseen categories
-                    features_df[col] = features_df[col].apply(
-                        lambda x: x if x in self.domain_classes_ else 'other'
-                    )
-                    if 'other' not in self.domain_classes_:
-                        self.domain_classes_ = np.append(self.domain_classes_, 'other')
-                        self.domain_encoder.classes_ = self.domain_classes_
-                    
-                    features_df[col] = self.domain_encoder.transform(features_df[col])
-                
-                elif col == 'location_encoded':
-                    if not hasattr(self, 'location_classes_'):
-                        self.location_encoder.fit(unique_vals)
-                        self.location_classes_ = self.location_encoder.classes_
-                    
-                    features_df[col] = features_df[col].apply(
-                        lambda x: x if x in self.location_classes_ else 'other'
-                    )
-                    if 'other' not in self.location_classes_:
-                        self.location_classes_ = np.append(self.location_classes_, 'other')
-                        self.location_encoder.classes_ = self.location_classes_
-                    
-                    features_df[col] = self.location_encoder.transform(features_df[col])
-        
-        # Select feature columns (exclude target)
-        feature_cols = [col for col in features_df.columns if col != 'target']
-        X = features_df[feature_cols].fillna(0)
-        
-        return X, feature_cols
-    
-    def train(self, students_df, internships_df, interactions_df=None):
-        """Train the ML recommendation model"""
-        print("Starting ML model training...")
-        
-        # Preprocess data
-        training_data = self.preprocess_data(students_df, internships_df, interactions_df)
-        
-        # Prepare features
-        X, self.feature_cols = self.prepare_features(training_data)
-        y = training_data['target']
-        
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-        
-        # Scale features
-        X_train_scaled = self.scaler.fit_transform(X_train)
-        X_test_scaled = self.scaler.transform(X_test)
-        
-        # Train model
-        print("Training Random Forest model...")
-        self.ml_model.fit(X_train_scaled, y_train)
-        
-        # Evaluate model
-        y_pred = self.ml_model.predict(X_test_scaled)
-        mse = mean_squared_error(y_test, y_pred)
-        mae = mean_absolute_error(y_test, y_pred)
-        
-        print(f"Model Performance:")
-        print(f"Mean Squared Error: {mse:.4f}")
-        print(f"Mean Absolute Error: {mae:.4f}")
-        
-        # Feature importance
-        feature_importance = pd.DataFrame({
-            'feature': self.feature_cols,
-            'importance': self.ml_model.feature_importances_
-        }).sort_values('importance', ascending=False)
-        
-        print("\nTop 10 Feature Importances:")
-        print(feature_importance.head(10))
-        
-        self.is_trained = True
-        return {'mse': mse, 'mae': mae, 'feature_importance': feature_importance}
-    
-    def predict_compatibility(self, student, internships_df):
-        """Predict compatibility scores for student-internship pairs"""
-        if not self.is_trained:
-            raise ValueError("Model must be trained before making predictions")
-        
-        predictions = []
-        
-        for _, internship in internships_df.iterrows():
-            # Create feature vector
-            features = self.create_feature_vector(student, internship)
-            features_df = pd.DataFrame([features])
-            
-            # Prepare features
-            X, _ = self.prepare_features(features_df)
-            
-            # Make prediction
-            X_scaled = self.scaler.transform(X)
-            predicted_score = self.ml_model.predict(X_scaled)[0]
-            
-            # Convert to 0-100 scale
-            match_score = min(100, max(0, (predicted_score / 5.0) * 100))
-            
-            predictions.append({
-                'internship_id': internship.get('id'),
-                'company_name': internship.get('company_name'),
-                'role_title': internship.get('role_title', internship.get('title')),
-                'domain': internship.get('domain'),
-                'location': internship.get('location'),
-                'match_score': round(match_score, 1),
-                'predicted_rating': round(predicted_score, 2),
-                'duration_weeks': internship.get('duration_weeks'),
-                'stipend': internship.get('stipend'),
-                'start_date': internship.get('start_date'),
-                'is_remote': internship.get('is_remote', False)
-            })
-        
-        return sorted(predictions, key=lambda x: x['match_score'], reverse=True)
-    
-    def get_recommendations(self, student_profile, internships_df, top_n=10):
-        """Get top N recommendations for a student"""
-        predictions = self.predict_compatibility(student_profile, internships_df)
-        return predictions[:top_n]
-    
-    def save_model(self, filepath):
-        """Save the trained model"""
-        if not self.is_trained:
-            raise ValueError("No trained model to save")
-        
-        model_data = {
-            'ml_model': self.ml_model,
-            'scaler': self.scaler,
-            'domain_encoder': self.domain_encoder,
-            'location_encoder': self.location_encoder,
-            'feature_cols': self.feature_cols,
-            'domain_classes_': getattr(self, 'domain_classes_', None),
-            'location_classes_': getattr(self, 'location_classes_', None)
-        }
-        
-        with open(filepath, 'wb') as f:
-            pickle.dump(model_data, f)
-        
-        print(f"Model saved to {filepath}")
-    
-    def load_model(self, filepath):
-        """Load a trained model"""
-        with open(filepath, 'rb') as f:
-            model_data = pickle.load(f)
-        
-        self.ml_model = model_data['ml_model']
-        self.scaler = model_data['scaler']
-        self.domain_encoder = model_data['domain_encoder']
-        self.location_encoder = model_data['location_encoder']
-        self.feature_cols = model_data['feature_cols']
-        
-        if model_data.get('domain_classes_') is not None:
-            self.domain_classes_ = model_data['domain_classes_']
-        if model_data.get('location_classes_') is not None:
-            self.location_classes_ = model_data['location_classes_']
-        
-        self.is_trained = True
-        print(f"Model loaded from {filepath}")
+            for synonyms in self._DOMAIN_GROUPS.values():
+                if sd_lower in synonyms and intern_lower in synonyms:
+                    return 0.85
+        # Semantic fallback
+        if student_domains:
+            return _semantic_sim(" ".join(student_domains), intern_domain)
+        return 0.0
 
-    def batch_predict(self, students_df, internships_df, top_n=10):
-        """Get recommendations for multiple students efficiently"""
-        if not self.is_trained:
-            raise ValueError("Model must be trained before making predictions")
-        
-        all_recommendations = {}
-        
+    # ── Training target ───────────────────────────────────────────────────────
+
+    def _build_real_target(
+        self,
+        student_id: Any,
+        internship_id: Any,
+        interactions_df: pd.DataFrame,
+    ) -> float | None:
+        """
+        Compute a 0–1 training target from real interaction_events.
+        Returns None if no real interactions exist (→ use synthetic fallback).
+        """
+        mask = (
+            (interactions_df["student_id"] == student_id) &
+            (interactions_df["internship_id"] == internship_id)
+        )
+        events = interactions_df[mask]
+        if events.empty:
+            return None
+        # Take the max weight across event types for this pair
+        max_weight = max(
+            EVENT_WEIGHTS.get(str(et), 0.0)
+            for et in events["event_type"].tolist()
+        )
+        # Normalize from [-0.5, 1.0] to [0, 5] for the regression target
+        return max(0.0, min(5.0, (max_weight + 0.5) * (5 / 1.5)))
+
+    def generate_synthetic_target(self, student: dict, internship: dict) -> float:
+        """
+        Rule-based synthetic training target — cold-start fallback.
+        Preserved from the original implementation.
+        """
+        score = 0.0
+        student_domains = self._coerce_list(student.get("preferred_domains", []))
+        intern_domain = str(internship.get("domain") or "")
+        score += self._domain_similarity(student_domains, intern_domain) * 3
+
+        student_locs = self._coerce_list(student.get("preferred_locations", []))
+        intern_loc = str(internship.get("location") or "")
+        if intern_loc in student_locs or internship.get("is_remote"):
+            score += 2.0
+        elif student_locs and intern_loc.split(",")[0] in [l.split(",")[0] for l in student_locs]:
+            score += 1.0
+
+        student_skills = {s.lower() for s in self._coerce_list(student.get("skills", []))}
+        required = {s.lower() for s in self._coerce_list(internship.get("required_skills", []))}
+        if required:
+            score += (len(student_skills & required) / len(required)) * 2.0
+
+        interests_text = " ".join(self._coerce_list(student.get("interests", [])))
+        jd_text = str(internship.get("description") or "")
+        score += _tfidf_sim(interests_text, jd_text)
+
+        score += np.random.normal(0, 0.3)
+        return max(0.0, min(5.0, score))
+
+    # ── Preprocessing ─────────────────────────────────────────────────────────
+
+    def preprocess_data(
+        self,
+        students_df: pd.DataFrame,
+        internships_df: pd.DataFrame,
+        interactions_df: pd.DataFrame | None = None,
+    ) -> pd.DataFrame:
+        log.info("Preprocessing data …")
+        pairs: list[dict] = []
+        has_real_interactions = (
+            interactions_df is not None and not interactions_df.empty
+        )
+
         for _, student in students_df.iterrows():
-            recommendations = self.get_recommendations(
-                student.to_dict(), 
-                internships_df, 
-                top_n=top_n
+            for _, internship in internships_df.iterrows():
+                vec = self.create_feature_vector(student.to_dict(), internship.to_dict())
+
+                if has_real_interactions:
+                    real_target = self._build_real_target(
+                        student.get("id"), internship.get("id"), interactions_df
+                    )
+                    vec["target"] = real_target if real_target is not None else self.generate_synthetic_target(student, internship)
+                else:
+                    log.debug("No interaction data — using synthetic target.")
+                    vec["target"] = self.generate_synthetic_target(student, internship)
+
+                pairs.append(vec)
+
+        return pd.DataFrame(pairs)
+
+    # ── Feature preparation ───────────────────────────────────────────────────
+
+    def prepare_features(self, data_df: pd.DataFrame):
+        features_df = data_df.copy()
+        for col, encoder, attr in [
+            ("domain_encoded", self.domain_encoder, "domain_classes_"),
+            ("location_encoded", self.location_encoder, "location_classes_"),
+        ]:
+            if col not in features_df.columns:
+                continue
+            unique_vals = features_df[col].unique()
+            if not hasattr(self, attr):
+                encoder.fit(unique_vals)
+                setattr(self, attr, encoder.classes_)
+            classes_ = getattr(self, attr)
+            features_df[col] = features_df[col].apply(
+                lambda x: x if x in classes_ else "other"
             )
-            all_recommendations[student['id']] = recommendations
-        
-        return all_recommendations
+            if "other" not in classes_:
+                new_classes = np.append(classes_, "other")
+                setattr(self, attr, new_classes)
+                encoder.classes_ = new_classes
+            features_df[col] = encoder.transform(features_df[col])
 
-    def explain_recommendation(self, student, internship):
-        """Provide explanation for why an internship was recommended"""
-        features = self.create_feature_vector(student, internship)
-        
-        explanation = {
-            'match_reasons': [],
-            'feature_scores': features
+        feature_cols = [c for c in features_df.columns if c != "target"]
+        X = features_df[feature_cols].fillna(0)
+        return X, feature_cols
+
+    # ── Training ──────────────────────────────────────────────────────────────
+
+    def train(
+        self,
+        students_df: pd.DataFrame,
+        internships_df: pd.DataFrame,
+        interactions_df: pd.DataFrame | None = None,
+    ) -> dict:
+        log.info("Starting ML model training …")
+
+        if students_df.empty or internships_df.empty:
+            log.warning("Insufficient data to train — falling back to synthetic-only mode.")
+            # Generate a minimal synthetic dataset from internships alone
+            students_df = pd.DataFrame([{
+                "id": "synthetic", "preferred_domains": [], "preferred_locations": [],
+                "skills": [], "interests": [],
+            }])
+
+        training_data = self.preprocess_data(students_df, internships_df, interactions_df)
+        X, self.feature_cols = self.prepare_features(training_data)
+        y = training_data["target"]
+
+        if len(X) < 4:
+            log.warning("Too few training samples (%d) — skipping train/test split.", len(X))
+            X_train, y_train = X, y
+            mse, mae = 0.0, 0.0
+        else:
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            X_train = self.scaler.fit_transform(X_train)
+            X_test_s = self.scaler.transform(X_test)
+            self.ml_model.fit(X_train, y_train)
+            y_pred = self.ml_model.predict(X_test_s)
+            mse = mean_squared_error(y_test, y_pred)
+            mae = mean_absolute_error(y_test, y_pred)
+            log.info("Model trained — MSE: %.4f  MAE: %.4f", mse, mae)
+
+            feat_imp = pd.DataFrame({
+                "feature": self.feature_cols,
+                "importance": self.ml_model.feature_importances_,
+            }).sort_values("importance", ascending=False)
+            log.info("Top features:\n%s", feat_imp.head(10).to_string(index=False))
+            self.is_trained = True
+            return {"mse": mse, "mae": mae, "feature_importance": feat_imp}
+
+        X_train = self.scaler.fit_transform(X_train)
+        self.ml_model.fit(X_train, y_train)
+        self.is_trained = True
+        return {"mse": mse, "mae": mae}
+
+    # ── Prediction ────────────────────────────────────────────────────────────
+
+    def predict_compatibility(
+        self, student: dict, internships_df: pd.DataFrame
+    ) -> list[dict]:
+        if not self.is_trained:
+            raise ValueError("Model must be trained before making predictions.")
+
+        predictions: list[dict] = []
+        student_skills = {s.lower() for s in self._coerce_list(student.get("skills", []))}
+
+        for _, internship in internships_df.iterrows():
+            intern_dict = internship.to_dict()
+            features = self.create_feature_vector(student, intern_dict)
+            feat_df = pd.DataFrame([features])
+            X, _ = self.prepare_features(feat_df)
+            X_scaled = self.scaler.transform(X)
+            raw_score = self.ml_model.predict(X_scaled)[0]
+            match_score = round(min(100, max(0, (raw_score / 5.0) * 100)), 1)
+
+            # Explainability
+            explanation = self.explain_match(
+                list(student_skills),
+                self._coerce_list(intern_dict.get("required_skills", [])),
+                intern_dict,
+                features,
+            )
+
+            predictions.append({
+                "internship_id": intern_dict.get("id"),
+                "company_name": intern_dict.get("company_name"),
+                "role_title": intern_dict.get("role_title") or intern_dict.get("title"),
+                "domain": intern_dict.get("domain"),
+                "location": intern_dict.get("location"),
+                "is_remote": intern_dict.get("is_remote", False),
+                "match_score": match_score,
+                "predicted_rating": round(raw_score, 2),
+                "duration_weeks": intern_dict.get("duration_weeks"),
+                "stipend": intern_dict.get("stipend"),
+                "apply_url": intern_dict.get("apply_url"),
+                "description": (intern_dict.get("description") or "")[:300],
+                # Phase 7 additions
+                "matched_skills": explanation["matched_skills"],
+                "missing_skills": explanation["missing_skills"],
+                "match_reasons": explanation["match_reasons"],
+            })
+
+        return sorted(predictions, key=lambda x: x["match_score"], reverse=True)
+
+    def get_recommendations(
+        self, student_profile: dict, internships_df: pd.DataFrame, top_n: int = 10
+    ) -> list[dict]:
+        return self.predict_compatibility(student_profile, internships_df)[:top_n]
+
+    # ── Explainability ────────────────────────────────────────────────────────
+
+    def explain_match(
+        self,
+        student_skills: list[str],
+        internship_skills: list[str],
+        internship: dict,
+        features: dict,
+    ) -> dict:
+        """
+        Returns matched_skills, missing_skills, and human-readable match_reasons.
+        Included in every recommendation response (Phase 7 requirement).
+        """
+        s_lower = {s.lower() for s in student_skills}
+        i_lower = {s.lower() for s in internship_skills}
+        matched = sorted(s_lower & i_lower)
+        missing = sorted(i_lower - s_lower)
+
+        reasons: list[str] = []
+        if features.get("domain_exact_match"):
+            reasons.append(f"Domain match: {internship.get('domain')}")
+        elif features.get("domain_similarity", 0) > 0.5:
+            reasons.append(f"Related domain: {internship.get('domain')}")
+        if features.get("location_exact_match"):
+            reasons.append(f"Preferred location: {internship.get('location')}")
+        elif features.get("is_remote"):
+            reasons.append("Remote-friendly")
+        if matched:
+            reasons.append(f"Matches {len(matched)}/{len(i_lower) or 1} required skill{'s' if len(matched) != 1 else ''}: {', '.join(matched[:4])}")
+        if features.get("interest_job_similarity", 0) > 0.3:
+            reasons.append("Aligns with your stated interests")
+
+        return {
+            "matched_skills": matched,
+            "missing_skills": missing,
+            "match_reasons": reasons,
         }
-        
-        # Domain matching explanation
-        if features['domain_exact_match'] == 1:
-            explanation['match_reasons'].append(f"Perfect domain match: {internship.get('domain')}")
-        elif features['domain_similarity'] > 0.5:
-            explanation['match_reasons'].append(f"Good domain similarity: {internship.get('domain')}")
-        
-        # Location matching explanation
-        if features['location_exact_match'] == 1:
-            explanation['match_reasons'].append(f"Preferred location: {internship.get('location')}")
-        elif features['is_remote'] == 1:
-            explanation['match_reasons'].append("Remote work available")
-        
-        # Skills matching explanation
-        if features['skills_coverage'] > 0.7:
-            explanation['match_reasons'].append("Strong skills match with requirements")
-        elif features['skills_coverage'] > 0.3:
-            explanation['match_reasons'].append("Good skills alignment")
-        
-        # Interest matching explanation
-        if features['interest_job_similarity'] > 0.3:
-            explanation['match_reasons'].append("Good alignment with your interests")
-        
-        return explanation
 
-    def get_model_performance(self):
-        """Get current model performance metrics"""
+    # ── Persistence ───────────────────────────────────────────────────────────
+
+    def save_model(self, filepath: str):
+        if not self.is_trained:
+            raise ValueError("No trained model to save.")
+        with open(filepath, "wb") as f:
+            pickle.dump({
+                "ml_model": self.ml_model,
+                "scaler": self.scaler,
+                "domain_encoder": self.domain_encoder,
+                "location_encoder": self.location_encoder,
+                "feature_cols": self.feature_cols,
+                "domain_classes_": getattr(self, "domain_classes_", None),
+                "location_classes_": getattr(self, "location_classes_", None),
+            }, f)
+        log.info("Model saved to %s", filepath)
+
+    def load_model(self, filepath: str):
+        with open(filepath, "rb") as f:
+            data = pickle.load(f)
+        self.ml_model = data["ml_model"]
+        self.scaler = data["scaler"]
+        self.domain_encoder = data["domain_encoder"]
+        self.location_encoder = data["location_encoder"]
+        self.feature_cols = data["feature_cols"]
+        if data.get("domain_classes_") is not None:
+            self.domain_classes_ = data["domain_classes_"]
+        if data.get("location_classes_") is not None:
+            self.location_classes_ = data["location_classes_"]
+        self.is_trained = True
+        log.info("Model loaded from %s", filepath)
+
+    # ── Compat methods (unchanged API surface) ────────────────────────────────
+
+    def explain_recommendation(self, student: dict, internship: dict) -> dict:
+        features = self.create_feature_vector(student, internship)
+        s_skills = self._coerce_list(student.get("skills", []))
+        i_skills = self._coerce_list(internship.get("required_skills", []))
+        return self.explain_match(s_skills, i_skills, internship, features)
+
+    def get_model_performance(self) -> dict:
         if not self.is_trained:
             return {"error": "Model not trained yet"}
-        
         return {
-            "model_type": "Random Forest Regressor",
+            "model_type": "Random Forest Regressor + Semantic Embeddings",
             "features_count": len(self.feature_cols),
             "is_trained": self.is_trained,
-            "feature_names": self.feature_cols
+            "feature_names": self.feature_cols,
+            "embeddings_available": _EMBED_AVAILABLE,
+        }
+
+    def batch_predict(self, students_df: pd.DataFrame, internships_df: pd.DataFrame, top_n: int = 10) -> dict:
+        if not self.is_trained:
+            raise ValueError("Model must be trained before making predictions.")
+        return {
+            str(student["id"]): self.get_recommendations(student.to_dict(), internships_df, top_n)
+            for _, student in students_df.iterrows()
         }
 
     def update_model_incremental(self, new_interactions_df, students_df, internships_df):
-        """Update model with new interaction data (simplified incremental learning)"""
-        print("Updating model with new interaction data...")
-        
-        # For now, retrain the entire model with new data
-        # In production, you might want to implement true incremental learning
+        log.info("Retraining with updated interaction data …")
         return self.train(students_df, internships_df, new_interactions_df)
