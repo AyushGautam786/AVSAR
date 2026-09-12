@@ -129,6 +129,7 @@ const RecommendationsPage: React.FC = () => {
         if (user) {
             try {
                 await createOrUpdateStudentProfile({
+                    user_id: user.id,
                     name: candidateName,
                     skills: skills,
                     preferred_domains: domains,

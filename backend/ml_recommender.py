@@ -13,6 +13,7 @@ Upgrades:
 
 import logging
 import pickle
+import re
 import warnings
 from typing import Any
 
@@ -62,13 +63,18 @@ def _semantic_sim(text_a: str, text_b: str) -> float:
 
 
 def _tfidf_sim(text_a: str, text_b: str) -> float:
-    """Fallback TF-IDF cosine similarity."""
+    """Fast token-overlap cosine similarity without re-fitting vectorizers on each comparison."""
     if not text_a or not text_b:
         return 0.0
     try:
-        vz = TfidfVectorizer(stop_words="english")
-        mat = vz.fit_transform([text_a, text_b])
-        return float(cosine_similarity(mat[0:1], mat[1:2])[0][0])
+        tokens_a = set(re.findall(r"\b[a-zA-Z0-9_+#.-]+\b", str(text_a).lower()))
+        tokens_b = set(re.findall(r"\b[a-zA-Z0-9_+#.-]+\b", str(text_b).lower()))
+        if not tokens_a or not tokens_b:
+            return 0.0
+        intersection = len(tokens_a & tokens_b)
+        if intersection == 0:
+            return 0.0
+        return float(intersection / ((len(tokens_a) * len(tokens_b)) ** 0.5))
     except Exception:
         return 0.0
 
@@ -360,17 +366,28 @@ class MLInternshipRecommender:
         if not self.is_trained:
             raise ValueError("Model must be trained before making predictions.")
 
-        predictions: list[dict] = []
+        if internships_df.empty:
+            return []
+
         student_skills = {s.lower() for s in self._coerce_list(student.get("skills", []))}
 
+        all_features = []
+        intern_rows = []
         for _, internship in internships_df.iterrows():
             intern_dict = internship.to_dict()
             features = self.create_feature_vector(student, intern_dict)
-            feat_df = pd.DataFrame([features])
-            X, _ = self.prepare_features(feat_df)
-            X_scaled = self.scaler.transform(X)
-            raw_score = self.ml_model.predict(X_scaled)[0]
-            match_score = round(min(100, max(0, (raw_score / 5.0) * 100)), 1)
+            all_features.append(features)
+            intern_rows.append((intern_dict, features))
+
+        feat_df = pd.DataFrame(all_features)
+        X, _ = self.prepare_features(feat_df)
+        X_scaled = self.scaler.transform(X)
+        raw_scores = self.ml_model.predict(X_scaled)
+
+        predictions: list[dict] = []
+        for i, (intern_dict, features) in enumerate(intern_rows):
+            raw_score = float(raw_scores[i])
+            match_score = round(min(100.0, max(0.0, (raw_score / 5.0) * 100)), 1)
 
             # Explainability
             explanation = self.explain_match(
