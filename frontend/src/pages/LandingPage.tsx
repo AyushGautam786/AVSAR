@@ -33,6 +33,13 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="site-shell">
+      <div className="ambient-field" aria-hidden="true">
+        <span className="ambient-orb ambient-orb-one" />
+        <span className="ambient-orb ambient-orb-two" />
+        <span className="ambient-orb ambient-orb-three" />
+        <span className="ambient-ring ambient-ring-one" />
+        <span className="ambient-ring ambient-ring-two" />
+      </div>
       <Header user={user} onSignOut={handleSignOut} onSignIn={() => setShowLoginModal(true)} />
 
       <main>
