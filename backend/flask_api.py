@@ -780,27 +780,62 @@ def parse_resume_to_profile():
         profile_json = {}
         try:
             response = chat(system, parsed_text[:8000], max_tokens=1000)
-            match = re.search(r"\{.*\}", response, re.DOTALL)
+            cleaned = re.sub(r"^```json\s*", "", response.strip(), flags=re.IGNORECASE)
+            cleaned = re.sub(r"^```\s*", "", cleaned)
+            cleaned = re.sub(r"```$", "", cleaned.strip())
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
             if match:
                 profile_json = json.loads(match.group())
         except Exception as exc:
-            log.warning("LLM profile parsing failed: %s", exc)
+            log.warning("LLM profile parsing failed (%s) — falling back to keyword extractor.", exc)
 
-        # Merge extracted profile with defaults
         extracted_skills = profile_json.get("skills", [])
         if not isinstance(extracted_skills, list):
             extracted_skills = [str(extracted_skills)]
 
+        # ── Fallback Heuristic Matcher: Extract skills and domains if LLM returned empty ──
+        if len(extracted_skills) == 0:
+            KNOWN_SKILLS = [
+                "Python", "JavaScript", "TypeScript", "React", "React Native", "Next.js", "Node.js",
+                "Express", "Django", "Flask", "FastAPI", "Java", "Spring Boot", "C++", "C#", ".NET",
+                "Golang", "Rust", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "AWS", "Azure",
+                "GCP", "Docker", "Kubernetes", "Linux", "Git", "GitHub", "HTML", "CSS", "Tailwind CSS",
+                "Machine Learning", "Deep Learning", "NLP", "Computer Vision", "TensorFlow", "PyTorch",
+                "Scikit-Learn", "Pandas", "NumPy", "REST APIs", "GraphQL", "Data Analysis", "Tableau",
+                "Power BI", "Figma", "UI/UX", "Agile", "DevOps", "CI/CD", "Cybersecurity", "Blockchain"
+            ]
+            found_skills = []
+            text_lower = parsed_text.lower()
+            for s in KNOWN_SKILLS:
+                pattern = r"\b" + re.escape(s.lower()) + r"\b"
+                if re.search(pattern, text_lower):
+                    found_skills.append(s)
+            extracted_skills = found_skills
+
         extracted_domains = profile_json.get("preferred_domains", [])
-        if not isinstance(extracted_domains, list):
-            extracted_domains = [str(extracted_domains)]
+        if not isinstance(extracted_domains, list) or len(extracted_domains) == 0:
+            KNOWN_DOMAINS = [
+                "Web Development", "Software Engineering", "Data Science", "Machine Learning",
+                "Mobile App Development", "Cloud & DevOps", "Cybersecurity", "UI/UX Design"
+            ]
+            found_domains = []
+            text_lower = parsed_text.lower()
+            for d in KNOWN_DOMAINS:
+                if d.lower() in text_lower or (d == "Web Development" and ("react" in text_lower or "html" in text_lower)):
+                    found_domains.append(d)
+            extracted_domains = found_domains or ["Software Engineering"]
 
         extracted_locations = profile_json.get("preferred_locations", [])
-        if not isinstance(extracted_locations, list):
-            extracted_locations = [str(extracted_locations)]
+        if not isinstance(extracted_locations, list) or len(extracted_locations) == 0:
+            extracted_locations = ["Remote"]
 
-        extracted_name = profile_json.get("name") or student.get("name") or "Student"
-        extracted_education = profile_json.get("education_level") or student.get("education_level") or ""
+        # Extract name from first line if not found
+        extracted_name = profile_json.get("name")
+        if not extracted_name or extracted_name.lower() in ("candidate full name", "student", "none"):
+            first_lines = [l.strip() for l in parsed_text.split("\n") if l.strip() and len(l.strip()) < 50]
+            extracted_name = first_lines[0] if first_lines else student.get("name") or "Student"
+
+        extracted_education = profile_json.get("education_level") or student.get("education_level") or "B.Tech / Bachelor's"
 
         # Update Supabase student record
         if supabase:
@@ -827,6 +862,7 @@ def parse_resume_to_profile():
     except Exception as exc:
         log.error("Resume parse-profile error: %s", exc)
         return jsonify({"error": str(exc)}), 500
+
 
 
 @app.route("/api/resume/tailor", methods=["POST"])

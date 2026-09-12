@@ -96,27 +96,37 @@ def _groq_chat(system_prompt: str, user_message: str, max_tokens: int) -> str:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    model = os.environ.get("GROQ_MODEL", "groq/compound-mini")
-    payload = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "temperature": 0.2,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
-    }
 
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
-    if resp.status_code != 200:
-        raise RuntimeError(f"Groq API error ({resp.status_code}): {resp.text}")
+    # Candidate models in order of priority
+    preferred = os.environ.get("GROQ_MODEL")
+    candidate_models = [m for m in [preferred, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound-mini", "qwen/qwen3.6-27b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"] if m]
 
-    data = resp.json()
-    content = data["choices"][0]["message"]["content"]
-    # Strip any <think> reasoning tags if present
-    import re
-    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
-    return content
+    last_error = None
+    for model in candidate_models:
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": 0.2,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+        }
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                import re
+                content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+                return content
+            else:
+                last_error = f"{resp.status_code}: {resp.text}"
+                log.debug("Groq model %s returned error: %s", model, last_error)
+        except Exception as exc:
+            last_error = str(exc)
+
+    raise RuntimeError(f"All Groq models failed. Last error: {last_error}")
 
 
 # ── 3. OpenRouter Free Tier ───────────────────────────────────────────────────
