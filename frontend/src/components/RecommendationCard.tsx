@@ -40,12 +40,12 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ rec, index, onA
   const hasExplainability = hasReasons || hasMatched || hasMissing;
 
   return (
-    <div className={`glass-card p-5 flex flex-col gap-4 ${rankGlow} animate-fade-in-up`} style={{ animationDelay: `${index * 60}ms` }}>
+    <div className={`glass-card recommendation-card p-5 flex flex-col gap-4 ${rankGlow} animate-fade-in-up`} style={{ animationDelay: `${index * 60}ms` }}>
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="recommendation-heading flex items-center gap-3 min-w-0">
           {/* Company avatar */}
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shrink-0 font-bold text-white text-sm">
+          <div className="company-monogram w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shrink-0 font-bold text-white text-sm">
             {rec.company_name?.[0] ?? '?'}
           </div>
           <div className="min-w-0">
@@ -65,7 +65,7 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ rec, index, onA
       </div>
 
       {/* Match score bar */}
-      <div>
+      <div className="match-meter">
         <div className="flex justify-between text-xs text-gray-600 mb-1">
           <span>Match strength</span>
           <span className="font-semibold text-white">{rec.match_score}%</span>
@@ -121,7 +121,7 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ rec, index, onA
 
       {/* Explainability toggle */}
       {hasExplainability && (
-        <div className="rounded-xl bg-white/3 border border-white/8 overflow-hidden">
+        <div className="explainability-panel rounded-xl bg-white/3 border border-white/8 overflow-hidden">
           <button
             onClick={() => setShowExplain(v => !v)}
             className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"

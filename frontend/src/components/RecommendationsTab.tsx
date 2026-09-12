@@ -43,11 +43,11 @@ const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
   onApply,
 }) => {
   return (
-    <div className="space-y-8">
+    <div className="workspace recommendations-workspace space-y-8">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="workspace-header flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shrink-0">
+          <div className="workspace-icon w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shrink-0">
             <Brain className="h-5 w-5 text-white" />
           </div>
           <div>
@@ -76,7 +76,7 @@ const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
 
       {/* Create Profile Call-to-Action card (shown when no recommendations yet) */}
       {!loading && recommendations.length === 0 && (
-        <div className="glass-card p-8 animate-fade-in-up">
+        <div className="glass-card profile-cta p-8 animate-fade-in-up">
           {/* Glowing orb background */}
           <div className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-indigo-600/10 blur-[80px]" />
@@ -145,7 +145,7 @@ const RecommendationsTab: React.FC<RecommendationsTabProps> = ({
       {/* Recommendations Grid */}
       {!loading && recommendations.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-5">
+          <div className="results-header flex items-center justify-between mb-5">
             <h2 className="text-xl font-bold text-white">
               <span className="gradient-text">{recommendations.length}</span> matches found
               {selectedStudent && <span className="text-gray-500 text-base font-normal ml-2">for {selectedStudent.name}</span>}

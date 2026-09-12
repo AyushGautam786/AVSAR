@@ -46,9 +46,9 @@ const InternshipsTab: React.FC<InternshipsTabProps> = ({
   }, [onSave]);
 
   return (
-    <div>
+    <div className="workspace internships-workspace">
       {/* Page header */}
-      <div className="mb-8">
+      <div className="workspace-header mb-8">
         <h1 className="text-3xl font-black text-white mb-2" style={{ fontFamily: 'var(--font-display)' }}>
           All Internships
         </h1>
@@ -58,7 +58,7 @@ const InternshipsTab: React.FC<InternshipsTabProps> = ({
       </div>
 
       {/* Search & Filter */}
-      <div className="glass p-4 rounded-2xl mb-8 flex flex-col sm:flex-row gap-3">
+      <div className="search-toolbar glass p-4 rounded-2xl mb-8 flex flex-col sm:flex-row gap-3">
         <form onSubmit={handleSearchSubmit} className="flex-1 flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -94,7 +94,7 @@ const InternshipsTab: React.FC<InternshipsTabProps> = ({
 
       {/* Loading skeleton */}
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="opportunity-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="glass-card p-5 h-72">
               <div className="shimmer rounded-lg h-5 w-3/4 mb-2" />
@@ -122,7 +122,7 @@ const InternshipsTab: React.FC<InternshipsTabProps> = ({
 
       {/* Grid */}
       {!isLoading && internships.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="opportunity-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {internships.map((internship, i) => (
             <div key={internship.id} className={`animate-fade-in-up delay-${Math.min(i * 50, 500)}`}>
               <InternshipCard

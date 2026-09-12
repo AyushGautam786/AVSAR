@@ -38,11 +38,11 @@ const InternshipCard: React.FC<InternshipCardProps> = ({
   const domainBadge = domainColors[internship.domain || ''] || 'badge-gray';
 
   return (
-    <div className="glass-card p-5 flex flex-col h-full group">
+    <div className="glass-card opportunity-card p-5 flex flex-col h-full group">
       {/* Header */}
       <div className="flex items-start justify-between mb-4 gap-3">
         <div className="flex-1 min-w-0">
-          <h3 className="text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">
+          <h3 className="opportunity-title text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">
             {internship.role_title || (internship as any).title}
           </h3>
           <div className="flex items-center gap-1.5 mt-1.5">
@@ -61,7 +61,7 @@ const InternshipCard: React.FC<InternshipCardProps> = ({
       </div>
 
       {/* Details */}
-      <div className="space-y-1.5 text-xs text-gray-500 mb-4">
+      <div className="opportunity-details space-y-1.5 text-xs text-gray-500 mb-4">
         <div className="flex items-center gap-2">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-600" />
           <span className="truncate">{internship.location || 'Location not specified'}</span>
@@ -84,7 +84,7 @@ const InternshipCard: React.FC<InternshipCardProps> = ({
 
       {/* Description */}
       {internship.description && (
-        <p className="text-gray-500 text-xs mb-4 line-clamp-2 flex-1 leading-relaxed">
+        <p className="opportunity-description text-gray-500 text-xs mb-4 line-clamp-2 flex-1 leading-relaxed">
           {internship.description}
         </p>
       )}
@@ -105,7 +105,7 @@ const InternshipCard: React.FC<InternshipCardProps> = ({
       <div className="flex-1" />
 
       {/* Actions */}
-      <div className="flex gap-2 pt-3 border-t border-white/8">
+      <div className="opportunity-actions flex gap-2 pt-3 border-t border-white/8">
         <button
           onClick={handleApply}
           disabled={!internship.apply_url}
