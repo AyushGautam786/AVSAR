@@ -11,32 +11,32 @@ interface AtsScoreCardProps {
 const AtsScoreCard: React.FC<AtsScoreCardProps> = ({ label, score, compareScore, isAfter = false }) => {
   const delta = compareScore !== undefined ? score - compareScore : null;
   const color =
-    score >= 70 ? '#10b981' :
-    score >= 40 ? '#f59e0b' :
-    '#f43f5e';
+    score >= 70 ? '#059669' :
+    score >= 40 ? '#d97706' :
+    '#e11d48';
 
   const bgColor =
-    score >= 70 ? 'rgba(16, 185, 129, 0.08)' :
-    score >= 40 ? 'rgba(245, 158, 11, 0.08)' :
-    'rgba(244, 63, 94, 0.08)';
+    score >= 70 ? 'rgba(5, 150, 105, 0.05)' :
+    score >= 40 ? 'rgba(217, 119, 6, 0.05)' :
+    'rgba(225, 29, 72, 0.05)';
 
   const borderColor =
-    score >= 70 ? 'rgba(16, 185, 129, 0.25)' :
-    score >= 40 ? 'rgba(245, 158, 11, 0.25)' :
-    'rgba(244, 63, 94, 0.25)';
+    score >= 70 ? 'rgba(5, 150, 105, 0.25)' :
+    score >= 40 ? 'rgba(217, 119, 6, 0.25)' :
+    'rgba(225, 29, 72, 0.25)';
 
   return (
     <div
-      className="glass-card rounded-2xl p-6 flex flex-col items-center gap-3 border transition-all duration-300 min-w-[200px]"
-      style={{ background: bgColor, borderColor }}
+      className="rounded-2xl p-6 flex flex-col items-center gap-3 border shadow-sm transition-all duration-300 min-w-[210px] bg-white"
+      style={{ backgroundColor: bgColor, borderColor }}
     >
-      <p className="text-sm font-semibold text-gray-300">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-700">{label}</p>
 
       {/* Circular gauge */}
-      <div className="relative w-28 h-28">
+      <div className="relative w-28 h-28 my-1">
         <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
           {/* Track */}
-          <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="8" />
+          <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="8" />
           {/* Progress */}
           <circle
             cx="50" cy="50" r="42"
@@ -50,20 +50,20 @@ const AtsScoreCard: React.FC<AtsScoreCardProps> = ({ label, score, compareScore,
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-3xl font-black text-white" style={{ fontFamily: 'var(--font-display)' }}>{score}%</span>
+          <span className="text-3xl font-black text-slate-900" style={{ fontFamily: 'var(--font-display)' }}>{score}%</span>
         </div>
       </div>
 
       {/* Delta badge */}
       {delta !== null && isAfter && (
         <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-          delta > 0 ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' :
-          delta < 0 ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' :
-          'bg-white/5 text-gray-400 border border-white/10'
+          delta > 0 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs' :
+          delta < 0 ? 'bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs' :
+          'bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs'
         }`}>
-          {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> :
-           delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> :
-           <Minus className="h-3.5 w-3.5" />}
+          {delta > 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> :
+           delta < 0 ? <TrendingDown className="h-3.5 w-3.5 text-rose-600" /> :
+           <Minus className="h-3.5 w-3.5 text-slate-500" />}
           {delta > 0 ? '+' : ''}{delta.toFixed(1)}% vs. original
         </div>
       )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp, ArrowDown } from 'lucide-react';
 
 interface DiffItem {
   section: string;
@@ -35,7 +35,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, fabricationFlags }) => {
 
   if (diff.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500 text-sm">
+      <div className="text-center py-8 text-slate-500 text-sm font-medium bg-slate-50 rounded-xl border border-slate-200">
         No changes were made to the resume content.
       </div>
     );
@@ -45,19 +45,19 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, fabricationFlags }) => {
     <div className="space-y-4">
       {/* Fabrication guard warnings */}
       {fabricationFlags.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-amber-300 text-sm mb-1">
+              <p className="font-bold text-amber-900 text-sm mb-1">
                 Fabrication guard: {fabricationFlags.length} new term{fabricationFlags.length !== 1 ? 's' : ''} detected
               </p>
-              <p className="text-amber-400/80 text-xs mb-3 leading-relaxed">
+              <p className="text-amber-800 text-xs mb-3 leading-relaxed">
                 These terms appear in the rewrite but weren't in your original resume. Please confirm you actually have this experience before downloading.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {fabricationFlags.map(flag => (
-                  <span key={flag} className="px-2.5 py-1 bg-amber-500/20 text-amber-200 rounded-lg text-xs font-semibold border border-amber-500/30">
+                  <span key={flag} className="px-2.5 py-1 bg-white text-amber-900 rounded-lg text-xs font-semibold border border-amber-200 shadow-xs">
                     {flag}
                   </span>
                 ))}
@@ -68,47 +68,56 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, fabricationFlags }) => {
       )}
 
       {/* Per-section diffs */}
-      {Object.entries(bySection).map(([section, items]) => (
-        <div key={section} className="glass-card rounded-xl overflow-hidden border border-white/8">
-          <button
-            onClick={() => toggleSection(section)}
-            className="w-full flex items-center justify-between px-5 py-3.5 bg-white/5 hover:bg-white/8 transition-colors text-left"
-          >
-            <span className="font-semibold text-white capitalize text-sm">
-              {section.replace(/_/g, ' ')}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-indigo-300 bg-indigo-500/20 border border-indigo-500/30 rounded-full px-2.5 py-0.5 font-medium">
-                {items.length} change{items.length !== 1 ? 's' : ''}
+      {Object.entries(bySection).map(([section, items]) => {
+        const isExpanded = expandedSections.has(section) || expandedSections.has('all');
+        return (
+          <div key={section} className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+            <button
+              onClick={() => toggleSection(section)}
+              className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50/90 hover:bg-slate-100/90 transition-colors text-left border-b border-slate-200"
+            >
+              <span className="font-bold text-slate-800 capitalize text-sm">
+                {section.replace(/_/g, ' ')}
               </span>
-              {expandedSections.has(section)
-                ? <ChevronUp className="h-4 w-4 text-gray-400" />
-                : <ChevronDown className="h-4 w-4 text-gray-400" />
-              }
-            </div>
-          </button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-teal-800 bg-teal-50 border border-teal-200 rounded-full px-2.5 py-0.5 font-bold">
+                  {items.length} change{items.length !== 1 ? 's' : ''}
+                </span>
+                {isExpanded
+                  ? <ChevronUp className="h-4 w-4 text-slate-500" />
+                  : <ChevronDown className="h-4 w-4 text-slate-500" />
+                }
+              </div>
+            </button>
 
-          {expandedSections.has(section) && (
-            <div className="divide-y divide-white/5">
-              {items.map((item, i) => (
-                <div key={i} className="px-5 py-4 space-y-3 bg-black/20">
-                  <div className="flex items-start gap-2.5">
-                    <span className="shrink-0 w-5 h-5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs flex items-center justify-center font-bold mt-0.5">−</span>
-                    <p className="text-xs sm:text-sm text-rose-300/80 line-through leading-relaxed">{item.original}</p>
+            {isExpanded && (
+              <div className="divide-y divide-slate-100">
+                {items.map((item, i) => (
+                  <div key={i} className="p-4 sm:p-5 space-y-2.5 bg-white">
+                    {/* Original bullet (Deleted / Strikethrough) */}
+                    <div className="bg-red-50/90 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-3">
+                      <span className="shrink-0 w-5 h-5 rounded-md bg-red-600 text-white text-xs flex items-center justify-center font-bold mt-0.5 shadow-xs">−</span>
+                      <p className="text-xs sm:text-sm text-red-900 line-through leading-relaxed font-normal">{item.original}</p>
+                    </div>
+
+                    {/* Transition arrow */}
+                    <div className="flex items-center gap-2 pl-4 py-0.5 text-slate-400">
+                      <ArrowDown className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+                      <span className="text-[11px] font-semibold text-teal-700 tracking-wide uppercase">AI Optimized Replacement</span>
+                    </div>
+
+                    {/* Rewritten bullet (Added / Enhanced) */}
+                    <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-3">
+                      <span className="shrink-0 w-5 h-5 rounded-md bg-emerald-600 text-white text-xs flex items-center justify-center font-bold mt-0.5 shadow-xs">+</span>
+                      <p className="text-xs sm:text-sm text-emerald-950 leading-relaxed font-semibold">{item.rewritten}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 pl-1 text-gray-500">
-                    <ArrowRight className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="shrink-0 w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs flex items-center justify-center font-bold mt-0.5">+</span>
-                    <p className="text-xs sm:text-sm text-emerald-300 leading-relaxed font-medium">{item.rewritten}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
