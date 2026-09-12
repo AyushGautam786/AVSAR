@@ -24,6 +24,8 @@ from datetime import datetime
 from functools import wraps
 from werkzeug.utils import secure_filename
 
+import math
+import numpy as np
 import jwt
 import pandas as pd
 from dotenv import load_dotenv
@@ -322,20 +324,22 @@ def get_internships():
 
 def _sanitize_for_json(obj):
     """Recursively converts NaN, Infinity, and numpy types to JSON-safe Python primitives."""
-    if obj is None or pd.isna(obj):
+    if obj is None:
         return None
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_sanitize_for_json(v) for v in obj]
     if isinstance(obj, (float, np.floating)):
-        if np.isnan(obj) or np.isinf(obj):
+        if math.isnan(obj) or math.isinf(obj):
             return None
         return float(obj)
     if isinstance(obj, (int, np.integer)):
         return int(obj)
     if isinstance(obj, (bool, np.bool_)):
         return bool(obj)
-    if isinstance(obj, dict):
-        return {str(k): _sanitize_for_json(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_sanitize_for_json(v) for v in obj]
+    if isinstance(obj, (str, bytes)):
+        return str(obj)
     return obj
 
 

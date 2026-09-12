@@ -12,6 +12,7 @@ Upgrades:
 """
 
 import logging
+import math
 import pickle
 import re
 import warnings
@@ -378,16 +379,18 @@ class MLInternshipRecommender:
         raw_scores = self.ml_model.predict(X_scaled)
 
         def _clean_val(v):
-            if v is None or pd.isna(v):
+            if v is None:
                 return None
             if isinstance(v, (float, np.floating)):
-                if np.isnan(v) or np.isinf(v):
+                if math.isnan(v) or math.isinf(v):
                     return None
                 return float(v)
             if isinstance(v, (int, np.integer)):
                 return int(v)
             if isinstance(v, (bool, np.bool_)):
                 return bool(v)
+            if isinstance(v, (str, bytes)):
+                return str(v)
             return v
 
         predictions: list[dict] = []
