@@ -1,31 +1,51 @@
 services:
-  # Flask API — deployed as a Render Web Service (Starter plan keeps it always-on)
+  # ── 1. Flask API — Render Web Service ──────────────────────────────────────
   - type: web
-    name: avsar-api
+    name: avsar-backend
     runtime: python
-    plan: starter
+    plan: free
+    region: oregon
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: gunicorn --chdir backend flask_api:app --workers 2 --timeout 120
+    startCommand: gunicorn --chdir backend flask_api:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: SUPABASE_URL
-        sync: false   # paste real value in Render dashboard
+        sync: false   # Paste your Supabase project URL from dashboard
       - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
+        sync: false   # Paste your Supabase service_role key
       - key: SUPABASE_JWT_SECRET
-        sync: false
+        sync: false   # Paste from Supabase Settings -> API -> JWT Secret
+      - key: LLM_PROVIDER
+        value: groq   # groq / gemini / anthropic
+      - key: GROQ_API_KEY
+        sync: false   # Paste your free Groq API key
+      - key: GEMINI_API_KEY
+        sync: false   # Optional: Google AI Studio key
+      - key: APIFY_API_TOKEN
+        sync: false   # Optional: Apify token for live scraper
+      - key: RESUME_STORAGE_BUCKET
+        value: resumes
       - key: CORS_ORIGIN
-        sync: false   # set to the Render static site URL below
+        sync: false   # Paste your frontend Render URL (e.g. https://avsar-frontend.onrender.com)
 
-  # React frontend — Render Static Site (free tier)
+  # ── 2. React Frontend — Render Static Site ─────────────────────────────────
   - type: web
     name: avsar-frontend
     runtime: static
+    plan: free
+    region: oregon
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
-        sync: false   # set to the avsar-api Render URL
+        sync: false   # Set to backend URL: https://avsar-backend.onrender.com
       - key: VITE_SUPABASE_URL
-        sync: false
+        sync: false   # Paste Supabase URL
       - key: VITE_SUPABASE_KEY
-        sync: false
+        sync: false   # Paste Supabase anon public key
+
