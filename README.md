@@ -169,10 +169,12 @@ Requires at least one enabled row in the `job_sources` Supabase table with a val
 
 ## Deployment
 
-Configured for [Render](https://render.com) via [`render.yaml`](render.yaml):
+AVSAR is fully optimized for **Render.com** (100% Free Tier):
 
-- **Frontend**: Static site → Vite build
-- **Backend**: Web service → Gunicorn (`gunicorn flask_api:app`)
+- **Infrastructure-as-Code**: Configured via [`render.yaml`](render.yaml) for 1-Click Blueprint deployment.
+- **Frontend**: Static Site (Vite 7 + React 19 + Node 20) with client-side SPA routing.
+- **Backend**: Web Service (Python 3.11 + Flask + Gunicorn) with thread-optimized memory footprint (safe on 512MB RAM).
+- **Step-by-Step Guide**: See the complete [Render Deployment Guide](RENDER_DEPLOYMENT.md) for detailed instructions.
 
 ---
 

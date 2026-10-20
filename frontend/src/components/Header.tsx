@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Activity, BriefcaseBusiness, ChevronDown, FileText, LayoutDashboard, LogIn, LogOut, Menu, ShieldCheck, Sparkles, Trash2, UserRound, X, Zap } from 'lucide-react';
 import AuthModal from './AuthModal';
+import { supabase } from '../lib/supabaseClient';
+import { API_BASE_URL } from '../lib/apiConfig';
 
 interface UserType { id: string; email?: string; user_metadata: { name?: string; avatar_url?: string; picture?: string } }
 interface HeaderProps { user: UserType | null; onSignIn?: () => void; onSignOut: () => void }
@@ -29,11 +31,10 @@ const Header: React.FC<HeaderProps> = ({ user, onSignIn, onSignOut }) => {
   const deleteAccount = async () => {
     if (!window.confirm('Delete your account? This permanently removes your profile, applications, resumes, and data.')) return;
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const client = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
-      const { data } = await client.auth.getSession(); const token = data?.session?.access_token;
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
       if (!token) return;
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/me`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       if (response.ok) { alert('Account deleted.'); onSignOut(); } else { const error = await response.json(); alert(`Error: ${error.error || 'Unknown error'}`); }
     } catch (error) { alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`); }
     setMenuOpen(false);

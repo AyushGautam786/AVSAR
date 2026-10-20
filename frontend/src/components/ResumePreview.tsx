@@ -41,11 +41,11 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
             onClick={() => setViewMode('tailored')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
               viewMode === 'tailored'
-                ? 'bg-white text-teal-800 shadow-xs border border-slate-200'
+                ? 'bg-white text-indigo-900 shadow-xs border border-slate-200'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Sparkles className="h-3.5 w-3.5 text-teal-600" />
+            <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
             Tailored ATS Version
           </button>
           <button
@@ -69,7 +69,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
                 type="checkbox"
                 checked={highlightChanges}
                 onChange={e => setHighlightChanges(e.target.checked)}
-                className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 h-3.5 w-3.5"
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
               />
               Highlight edits
             </label>
@@ -149,8 +149,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
                 return (
                   <div key={sectionName} className="space-y-2">
                     {/* Section Title */}
-                    <div className="border-b-2 border-teal-800/80 pb-1 flex items-center justify-between">
-                      <h2 className="text-xs sm:text-sm font-bold tracking-wider text-teal-900 uppercase">
+                    <div className="border-b-2 border-indigo-700/80 pb-1 flex items-center justify-between">
+                      <h2 className="text-xs sm:text-sm font-bold tracking-wider text-indigo-950 uppercase">
                         {cleanHeading}
                       </h2>
                     </div>

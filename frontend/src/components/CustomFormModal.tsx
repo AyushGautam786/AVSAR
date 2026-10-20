@@ -53,9 +53,9 @@ const TagSection: React.FC<TagSectionProps> = ({
   onRemove,
 }) => {
   const addBtnColor = {
-    indigo: 'bg-teal-700 hover:bg-teal-800',
-    violet: 'bg-teal-700 hover:bg-teal-800',
-    cyan:   'bg-teal-700 hover:bg-teal-800',
+    indigo: 'bg-indigo-600 hover:bg-indigo-700',
+    violet: 'bg-indigo-600 hover:bg-indigo-700',
+    cyan:   'bg-indigo-600 hover:bg-indigo-700',
   }[color];
 
   const selectOptions = [
@@ -404,9 +404,9 @@ const CustomFormModal: React.FC<CustomFormModalProps> = ({
           </div>
 
           {(customForm.preferred_domains.length > 0 || customForm.skills.length > 0) && (
-            <div className="p-4 rounded-xl bg-teal-50 border border-teal-200">
-              <p className="text-xs font-bold text-teal-900 mb-2 flex items-center gap-1.5">
-                <CheckCircle className="h-3.5 w-3.5 text-teal-700" /> Profile Summary
+            <div className="p-4 rounded-xl bg-indigo-50/80 border border-indigo-100">
+              <p className="text-xs font-bold text-indigo-950 mb-2 flex items-center gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5 text-indigo-600" /> Profile Summary
               </p>
               <div className="text-xs text-slate-600 space-y-0.5 font-medium">
                 {customForm.skills.length > 0 && <p>✦ {customForm.skills.length} skill(s) added</p>}

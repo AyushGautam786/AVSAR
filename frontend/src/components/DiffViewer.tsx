@@ -80,7 +80,7 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, fabricationFlags }) => {
                 {section.replace(/_/g, ' ')}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-teal-800 bg-teal-50 border border-teal-200 rounded-full px-2.5 py-0.5 font-bold">
+                <span className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-0.5 font-bold">
                   {items.length} change{items.length !== 1 ? 's' : ''}
                 </span>
                 {isExpanded
@@ -102,8 +102,8 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ diff, fabricationFlags }) => {
 
                     {/* Transition arrow */}
                     <div className="flex items-center gap-2 pl-4 py-0.5 text-slate-400">
-                      <ArrowDown className="h-3.5 w-3.5 text-teal-600 shrink-0" />
-                      <span className="text-[11px] font-semibold text-teal-700 tracking-wide uppercase">AI Optimized Replacement</span>
+                      <ArrowDown className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                      <span className="text-[11px] font-semibold text-indigo-700 tracking-wide uppercase">AI Optimized Replacement</span>
                     </div>
 
                     {/* Rewritten bullet (Added / Enhanced) */}

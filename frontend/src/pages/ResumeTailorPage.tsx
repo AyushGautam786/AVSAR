@@ -11,8 +11,7 @@ import DiffViewer from '../components/DiffViewer';
 import ResumePreview from '../components/ResumePreview';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabaseClient';
-
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/['"]/g, '').replace(/\/$/, '');
+import { API_BASE_URL } from '../lib/apiConfig';
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -203,7 +202,7 @@ const ResumeTailorPage: React.FC = () => {
                 <div
                   className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap ${
                     isCurrent
-                      ? 'bg-teal-800 text-white shadow-sm border border-teal-900'
+                      ? 'bg-indigo-900 text-white shadow-sm border border-indigo-950'
                       : isCompleted
                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
                       : 'bg-white text-slate-500 border border-slate-200'
@@ -256,10 +255,10 @@ const ResumeTailorPage: React.FC = () => {
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-2xl p-10 sm:p-14 text-center cursor-pointer transition-all duration-300 ${
                 isDragging
-                  ? 'border-teal-600 bg-teal-50/50 scale-[1.01]'
+                  ? 'border-indigo-600 bg-indigo-50/50 scale-[1.01]'
                   : resumeFile
                   ? 'border-emerald-500 bg-emerald-50/40'
-                  : 'border-slate-300 hover:border-teal-600 bg-slate-50/50 hover:bg-slate-50'
+                  : 'border-slate-300 hover:border-indigo-600 bg-slate-50/50 hover:bg-slate-50'
               }`}
             >
               <input
@@ -284,7 +283,7 @@ const ResumeTailorPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 text-slate-500">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-teal-700 group-hover:scale-110 transition-transform">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-indigo-700 group-hover:scale-110 transition-transform">
                     <Upload className="h-6 w-6" />
                   </div>
                   <div>
@@ -323,7 +322,7 @@ const ResumeTailorPage: React.FC = () => {
               onChange={e => setJdText(e.target.value)}
               rows={12}
               placeholder="Paste the job description, required skills, and responsibilities here…"
-              className="w-full p-4 text-sm font-normal rounded-xl border border-slate-300 focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 outline-none resize-none leading-relaxed min-h-[260px] text-slate-900 placeholder:text-slate-400 bg-white"
+              className="w-full p-4 text-sm font-normal rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 outline-none resize-none leading-relaxed min-h-[260px] text-slate-900 placeholder:text-slate-400 bg-white"
             />
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -361,8 +360,8 @@ const ResumeTailorPage: React.FC = () => {
                 Extracting high-priority ATS keywords from the job description, rewording bullet points with truthful phrasing, and calculating score uplift.
               </p>
             </div>
-            <div className="flex items-center justify-center gap-2 text-xs text-teal-800 font-semibold pt-2">
-              <RefreshCw className="h-3.5 w-3.5 animate-spin text-teal-700" />
+            <div className="flex items-center justify-center gap-2 text-xs text-indigo-900 font-semibold pt-2">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-700" />
               <span>Checking fabrication guard & generating ATS-safe output</span>
             </div>
           </div>
@@ -404,7 +403,7 @@ const ResumeTailorPage: React.FC = () => {
                 onClick={() => setResultsTab('preview')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                   resultsTab === 'preview'
-                    ? 'bg-teal-800 text-white shadow-sm'
+                    ? 'bg-indigo-900 text-white shadow-sm'
                     : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -415,7 +414,7 @@ const ResumeTailorPage: React.FC = () => {
                 onClick={() => setResultsTab('diff')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                   resultsTab === 'diff'
-                    ? 'bg-teal-800 text-white shadow-sm'
+                    ? 'bg-indigo-900 text-white shadow-sm'
                     : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -433,7 +432,7 @@ const ResumeTailorPage: React.FC = () => {
                 onClick={() => setResultsTab('keywords')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                   resultsTab === 'keywords'
-                    ? 'bg-teal-800 text-white shadow-sm'
+                    ? 'bg-indigo-900 text-white shadow-sm'
                     : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -485,7 +484,7 @@ const ResumeTailorPage: React.FC = () => {
                   {result.jd_keywords.map(kw => (
                     <span
                       key={kw}
-                      className="px-3 py-1.5 bg-teal-50 text-teal-900 rounded-lg text-xs font-bold border border-teal-200/90 shadow-2xs"
+                      className="badge badge-indigo text-xs font-bold px-3 py-1.5 rounded-lg"
                     >
                       {kw}
                     </span>

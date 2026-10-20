@@ -50,10 +50,12 @@ log.info("AVSAR API initializing...")
 # ── App setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
-# Allow all localhost and 127.0.0.1 dev ports, plus any production CORS_ORIGIN configured
+# Allow all localhost and 127.0.0.1 dev ports, plus Render / Vercel domains and any configured CORS_ORIGIN
 _cors_origins = [
     r"^https?:\/\/localhost(:\d+)?$",
     r"^https?:\/\/127\.0\.0\.1(:\d+)?$",
+    r"^https:\/\/.*\.onrender\.com$",
+    r"^https:\/\/.*\.vercel\.app$",
 ]
 _env_origin = os.environ.get("CORS_ORIGIN")
 if _env_origin:
@@ -71,11 +73,17 @@ limiter = Limiter(
 )
 
 # ── Supabase client (service role — full DB access, server-side only) ────────
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as exc:
+        log.error("Failed to initialize Supabase client: %s", exc)
+        supabase = None
 
 # ── ML recommender ────────────────────────────────────────────────────────────
 recommender = MLInternshipRecommender()
@@ -279,6 +287,15 @@ def get_internships():
         q = request.args.get("q", "").strip()
         page = max(1, int(request.args.get("page", 1)))
         page_size = min(100, max(1, int(request.args.get("page_size", 20))))
+
+        if not supabase:
+            return jsonify({
+                "data": [],
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": 0,
+            })
 
         query = supabase.table("internships").select(
             "*, companies(name, logo_url)",
@@ -654,7 +671,7 @@ def retrain_model():
 # ── Resume Tailoring ─────────────────────────────────────────────────────────
 
 ALLOWED_RESUME_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt"}
-RESUME_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET_RESUMES", "resumes")
+RESUME_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET_RESUMES") or os.environ.get("RESUME_STORAGE_BUCKET") or "resumes"
 
 
 @app.route("/api/resume/upload", methods=["POST"])
